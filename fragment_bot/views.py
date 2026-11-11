@@ -8,9 +8,17 @@ from aiogram.exceptions import (
     TelegramAPIError,
     TelegramBadRequest,
     TelegramNetworkError,
+    TelegramNotFound,
     TelegramServerError,
 )
-from aiogram.types import FSInputFile, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.methods import EditMessageText, SendRichMessage
+from aiogram.types import (
+    FSInputFile,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    InputRichMessage,
+    Message,
+)
 
 from .catalog import Product
 from .store import STATUS, Order
@@ -34,6 +42,53 @@ STATUS_ICONS = {
     "refunding": "↩️",
     "refunded": "↩️",
 }
+
+
+# IDs checked through getCustomEmojiStickers and the public TgAndroidIcons pack.
+PREMIUM_ICONS = {
+    "🏪": "5983399041197675256",
+    "🛍": "5983399041197675256",
+    "👤": "5771887475421090729",
+    "💬": "5886666250158870040",
+    "⚙": "5877260593903177342",
+    "🛠": "5988023995125993550",
+    "📄": "5839323457015256759",
+    "🧾": "5839323457015256759",
+    "💳": "5967548335542767952",
+    "⭐": "5874948844935974490",
+    "💎": "5807465992363710697",
+    "📦": "5924720918826848520",
+    "🎨": "5814690801665446789",
+    "📊": "5877485980901971030",
+    "🔎": "5874960879434338403",
+    "📥": "5877307202888273539",
+    "✅": "5920052658743283381",
+    "‹": "5875082500023258804",
+    "ℹ": "5258503720928288433",
+}
+
+
+def premium_markup(markup: InlineKeyboardMarkup) -> InlineKeyboardMarkup:
+    rows = []
+    for row in markup.inline_keyboard:
+        updated = []
+        for item in row:
+            prefix, _, label = item.text.partition(" ")
+            icon = PREMIUM_ICONS.get(prefix.replace("\ufe0f", ""))
+            if icon and label:
+                item = item.model_copy(update={"text": label, "icon_custom_emoji_id": icon})
+            updated.append(item)
+        rows.append(updated)
+    return keys(*rows)
+
+
+def rich_table(title: str, rows: list[tuple[str, str]], footer: str = "") -> str:
+    cells = "".join(
+        f"<tr><td>{escape(key)}</td><td>{escape(value)}</td></tr>" for key, value in rows
+    )
+    return f"<h3>{escape(title)}</h3><table>{cells}</table>" + (
+        f"<footer>{escape(footer)}</footer>" if footer else ""
+    )
 
 
 def button(text: str, action: str, *, style: str | None = None) -> InlineKeyboardButton:
@@ -71,12 +126,15 @@ def order_card(order: Order, *, admin: bool = False) -> str:
     text = (
         f"<b>🧾 Заказ</b> <code>#{escape(order.id)}</code>\n\n"
         f"<b>{order_title(order)}</b>\n"
-        f"Получатель  <b>@{escape(order.recipient)}</b>\n"
-        f"Сумма  <b>{escape(price(order.price, order.currency))}</b>\n\n"
+        f"<blockquote>Получатель  <b>@{escape(order.recipient)}</b>\n"
+        f"Сумма  <b>{escape(price(order.price, order.currency))}</b></blockquote>\n"
         f"{STATUS_ICONS[order.state]} <b>{STATUS[order.state]}</b>"
     )
     if admin:
         text += f"\n\nПокупатель  <code>{order.buyer}</code>"
+        if order.charge_id:
+            text += f"\nПровайдер  <code>{escape(order.provider)}</code>"
+            text += f"\nПлатёж  <code>{escape(order.charge_id)}</code>"
         if order.operation_id:
             text += f"\nОперация Fragment  <code>{escape(order.operation_id)}</code>"
         if order.transaction_id:
@@ -113,16 +171,61 @@ async def screen(
     *,
     edit: bool = False,
     banner: Path | None = None,
+    rich: str | None = None,
+    icons: bool = False,
 ) -> None:
+    decorated = premium_markup(markup) if icons else markup
+
+    async def request(method, *, timeout: int | None = None):
+        try:
+            return await message.bot(method, request_timeout=timeout)
+        except TelegramBadRequest as exc:
+            error = exc.message.lower()
+            if decorated == markup or not any(term in error for term in ("emoji", "button")):
+                raise
+            return await message.bot(
+                method.model_copy(update={"reply_markup": markup}), request_timeout=timeout
+            )
+
+    if rich and not (edit and message.photo):
+        rich_message = InputRichMessage(html=rich)
+        if edit:
+            method = EditMessageText(
+                chat_id=message.chat.id,
+                message_id=message.message_id,
+                rich_message=rich_message,
+                reply_markup=decorated,
+                parse_mode=None,
+            )
+        else:
+            method = SendRichMessage(
+                chat_id=message.chat.id,
+                rich_message=rich_message,
+                reply_markup=decorated,
+            )
+        try:
+            await request(method, timeout=4)
+            return
+        except TelegramBadRequest as exc:
+            if "message is not modified" in exc.message.lower():
+                return
+            log.info("Telegram rejected the rich screen, using HTML")
+        except (TelegramNotFound, TelegramNetworkError, TelegramServerError):
+            log.info("Rich screen unavailable, using HTML")
+
     if edit:
         try:
             if message.photo and len(text.encode("utf-16-le")) // 2 <= 1024:
-                await message.edit_caption(
-                    caption=text, parse_mode=ParseMode.HTML, reply_markup=markup
+                await request(
+                    message.edit_caption(
+                        caption=text, parse_mode=ParseMode.HTML, reply_markup=decorated
+                    )
                 )
                 return
             if not message.photo:
-                await message.edit_text(text, parse_mode=ParseMode.HTML, reply_markup=markup)
+                await request(
+                    message.edit_text(text, parse_mode=ParseMode.HTML, reply_markup=decorated)
+                )
                 return
         except TelegramBadRequest as exc:
             if "message is not modified" in exc.message.lower():
@@ -131,16 +234,16 @@ async def screen(
     elif banner and banner.is_file() and len(text.encode("utf-16-le")) // 2 <= 1024:
         try:
             photo = message.answer_photo(
-                FSInputFile(banner), caption=text, parse_mode=ParseMode.HTML, reply_markup=markup
+                FSInputFile(banner), caption=text, parse_mode=ParseMode.HTML, reply_markup=decorated
             )
-            await message.bot(photo, request_timeout=4)
+            await request(photo, timeout=4)
         except (TelegramBadRequest, TelegramNetworkError, TelegramServerError) as exc:
             log.warning(
                 "Shop banner unavailable, sending the menu as text (%s)", type(exc).__name__
             )
         else:
             return
-    await message.answer(text, parse_mode=ParseMode.HTML, reply_markup=markup)
+    await request(message.answer(text, parse_mode=ParseMode.HTML, reply_markup=decorated))
 
 
 async def notify(bot: Bot, order: Order) -> None:

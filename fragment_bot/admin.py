@@ -1,5 +1,7 @@
+import re
 from collections.abc import Callable
 from datetime import UTC, datetime
+from functools import partial
 from html import escape
 
 from aiogram import F, Router
@@ -12,7 +14,7 @@ from .catalog import Product, number
 from .config import Config, ShopError
 from .fulfillment import Fulfillment
 from .payments import Checkout
-from .store import Order, Store
+from .store import ADMIN_PAGE_SIZE, STATUS, Order, Store
 from .views import (
     PRODUCTS,
     STATUS_ICONS,
@@ -24,9 +26,19 @@ from .views import (
     order_card,
     package,
     price,
-    screen,
+    rich_table,
+)
+from .views import (
+    screen as render_screen,
 )
 
+ORDER_SECTIONS = {
+    "queue": "В работе",
+    "all": "Все заказы",
+    "review": "На проверке",
+    "closed": "Завершённые",
+    "payments": "История платежей",
+}
 ACTIONS = {"approve": "Подтвердить выдачу", "refund": "Вернуть оплату"}
 BRAND = {"name": "Название", "welcome": "Приветствие", "support": "Поддержка", "terms": "Условия"}
 
@@ -34,6 +46,7 @@ BRAND = {"name": "Название", "welcome": "Приветствие", "suppo
 class AdminInput(StatesGroup):
     brand = State()
     product = State()
+    search = State()
 
 
 def admin_only(config: Config, user_id: int) -> None:
@@ -42,10 +55,18 @@ def admin_only(config: Config, user_id: int) -> None:
 
 
 async def show_order(
-    message: Message, order: Order, *, admin: bool = False, edit: bool = False
+    message: Message,
+    order: Order,
+    *,
+    admin: bool = False,
+    edit: bool = False,
+    icons: bool = False,
+    source: str = "",
 ) -> None:
     if not admin:
-        await screen(message, order_card(order), buyer_order_keys(order), edit=edit)
+        await render_screen(
+            message, order_card(order), buyer_order_keys(order), edit=edit, icons=icons
+        )
         return
     rows = []
     if order.state == "paid":
@@ -58,40 +79,50 @@ async def show_order(
         rows.append([button("↩️ Вернуть оплату", f"ask:refund:{order.id}", style="danger")])
     rows.extend(
         [
-            [button("↻ Обновить", f"adminorder:{order.id}")],
-            back("admin:queue", "К заказам"),
+            [button("↻ Обновить", f"adminorder:{order.id}{source}")],
+            back(f"adminorders{source}" if source else "admin:queue", "К списку"),
         ]
     )
-    await screen(message, order_card(order, admin=True), keys(*rows), edit=edit)
+    await render_screen(message, order_card(order, admin=True), keys(*rows), edit=edit, icons=icons)
 
 
 def admin_router(
     config: Config, store: Store, checkout: Checkout, fulfillment: Fulfillment
 ) -> Router:
     router = Router()
+    screen = partial(render_screen, icons=config.premium_icons)
 
     async def dashboard(message: Message, *, edit: bool = False) -> None:
         settings = store.settings()
-        opened = settings["open"] == "1"
-        status = "🟢 Витрина открыта" if opened else "🔴 Витрина закрыта"
+        totals = store.shop_totals()
+        status = "Открыта" if settings["open"] == "1" else "Закрыта"
+        rows = [
+            ("Витрина", status),
+            ("Режим", config.mode),
+            ("Заказы в работе", str(totals["pending"])),
+            ("Платежи на проверке", str(totals["unmatched"])),
+        ]
+        plain = "\n".join(f"{label}  <b>{value}</b>" for label, value in rows)
         await screen(
             message,
-            f"<b>⚙️ Управление магазином</b>\n\n{escape(settings['name'])}\n"
-            f"{status} · <code>{config.mode}</code>",
+            f"<b>⚙️ Админ-панель</b>\n{escape(settings['name'])}\n\n<blockquote>{plain}</blockquote>",
             keys(
-                [button("🧾 Заказы", "admin:queue", style="primary")],
-                [button("📦 Товары", "admin:catalog"), button("🎨 Оформление", "admin:brand")],
-                [button("💳 Платежи", "admin:payments"), button("📖 Команды", "admin:help")],
                 [
-                    button(
-                        "Закрыть витрину" if opened else "Открыть витрину",
-                        "admin:close" if opened else "admin:open",
-                        style="danger" if opened else "success",
-                    )
+                    button("🧾 Заказы", "admin:queue", style="primary"),
+                    button("💳 Платежи", "admin:payments"),
                 ],
+                [
+                    button("📦 Товары и цены", "admin:catalog"),
+                    button("📊 Статистика", "admin:stats"),
+                ],
+                [button("🎨 Оформление", "admin:brand"), button("⚙️ Настройки", "admin:settings")],
+                [button("🛠 Система", "admin:system"), button("📄 Команды", "admin:help")],
                 back("menu", "В магазин"),
             ),
             edit=edit,
+            rich=rich_table("Админ-панель · " + settings["name"], rows)
+            if config.rich_menus
+            else None,
         )
 
     @router.message(Command("admin"))
@@ -100,27 +131,101 @@ def admin_router(
         await state.clear()
         await dashboard(message)
 
-    async def queue(message: Message, *, edit: bool = False) -> None:
-        orders = store.orders(pending=True)
+    async def orders_page(
+        message: Message,
+        *,
+        group: str = "queue",
+        page: int = 0,
+        edit: bool = False,
+        search: str = "",
+    ) -> None:
+        orders, total, page = store.admin_orders(group, page, search=search)
+        title = "Поиск заказов" if search else ORDER_SECTIONS[group]
+        source = f":{group}:{page}" if group != "queue" or page else ""
         rows = [
             [
                 button(
-                    f"{STATUS_ICONS[order.state]} {package(order.product)} · @{order.recipient}",
-                    f"adminorder:{order.id}",
+                    (
+                        f"{STATUS_ICONS[order.state]} {price(order.price, order.currency)} · {STATUS[order.state]}"
+                        if group == "payments"
+                        else f"{STATUS_ICONS[order.state]} {package(order.product)} · @{order.recipient} · #{order.id[:6]}"
+                    ),
+                    f"adminorder:{order.id}{source}",
                 )
             ]
             for order in orders
         ]
-        text = "Выберите заказ." if orders else "Заказов в работе пока нет."
+        pages = max(1, (total + ADMIN_PAGE_SIZE - 1) // ADMIN_PAGE_SIZE)
+        if pages > 1:
+            arrows = []
+            if page:
+                previous = (
+                    f"adminsearch:{page - 1}:{search}"
+                    if search
+                    else f"adminorders:{group}:{page - 1}"
+                )
+                arrows.append(button("‹ Предыдущая", previous))
+            if page + 1 < pages:
+                following = (
+                    f"adminsearch:{page + 1}:{search}"
+                    if search
+                    else f"adminorders:{group}:{page + 1}"
+                )
+                arrows.append(button("Следующая ›", following))
+            rows.append(arrows)
+        if group == "payments":
+            rows.append(back("admin:payments", "К платежам"))
+        else:
+            filters = [
+                button(
+                    label,
+                    f"adminorders:{key}:0",
+                    style="primary" if group == key and not search else None,
+                )
+                for key, label in ORDER_SECTIONS.items()
+                if key != "payments"
+            ]
+            rows.extend(
+                [
+                    filters[:2],
+                    filters[2:],
+                    [button("🔎 Поиск", "admin:search")],
+                    back("admin", "Управление"),
+                ]
+            )
+        summary = (
+            f"Записей  <b>{total}</b> · Страница <b>{page + 1}/{pages}</b>"
+            if orders
+            else "Здесь пока пусто."
+        )
+        if search:
+            summary = f"<code>{escape(search)}</code>\n\n{summary}"
+        await screen(message, f"<b>🧾 {title}</b>\n\n{summary}", keys(*rows), edit=edit)
+
+    async def payment_home(message: Message, *, edit: bool = False) -> None:
+        totals = store.shop_totals()
+        title = "Платежи XTR" if config.mode == "live" else "Тестовые платежи XTR"
+        rows = [
+            ("Платежей", str(totals["payments"])),
+            ("Принято", price(totals["received_xtr"])),
+            ("Возвращено", price(totals["returned_xtr"])),
+            ("На проверке", str(totals["unmatched"])),
+        ]
+        plain = "\n".join(f"{label}  <b>{value}</b>" for label, value in rows)
         await screen(
             message,
-            f"<b>🧾 Заказы в работе</b>\n\n{text}",
-            keys(*rows, back("admin", "Управление")),
+            f"<b>💳 {title}</b>\n\n<blockquote>{plain}</blockquote>",
+            keys(
+                [button("🧾 История платежей", "adminorders:payments:0", style="primary")],
+                [button("🔎 Несопоставленные платежи", "admin:unmatched")],
+                back("admin", "Управление"),
+            ),
             edit=edit,
+            rich=rich_table(title, rows) if config.rich_menus else None,
         )
 
     async def payment_errors(message: Message, *, edit: bool = False) -> None:
-        errors = store.payment_exceptions()[:10]
+        errors = store.payment_exceptions(pending_only=True)[:10]
         text = "\n".join(
             f"#{escape(row['order_id'][:40])} · <code>{row['buyer']}</code> · "
             f"{escape(price(row['amount'], row['currency']))}"
@@ -129,7 +234,7 @@ def admin_router(
         await screen(
             message,
             "<b>💳 Платежи на проверке</b>\n\n" + (text or "Несопоставленных платежей пока нет."),
-            keys(back("admin", "Управление")),
+            keys(back("admin:payments", "К платежам")),
             edit=edit,
         )
 
@@ -160,14 +265,74 @@ def admin_router(
         admin_only(config, query.from_user.id)
         await state.clear()
         page = query.data
-        if page in {"admin", "admin:open", "admin:close"}:
-            if page != "admin":
-                store.configure("open", "1" if page == "admin:open" else "0")
+        if page == "admin":
             await dashboard(query.message, edit=True)
         elif page == "admin:queue":
-            await queue(query.message, edit=True)
+            await orders_page(query.message, edit=True)
         elif page == "admin:payments":
+            await payment_home(query.message, edit=True)
+        elif page == "admin:unmatched":
             await payment_errors(query.message, edit=True)
+        elif page in {"admin:settings", "admin:open", "admin:close"}:
+            if page != "admin:settings":
+                store.configure("open", "1" if page == "admin:open" else "0")
+            opened = store.settings()["open"] == "1"
+            status = "🟢 Витрина открыта" if opened else "🔴 Витрина закрыта"
+            await screen(
+                query.message,
+                f"<b>⚙️ Настройки</b>\n\n{status}",
+                keys(
+                    [
+                        button(
+                            "Закрыть витрину" if opened else "Открыть витрину",
+                            "admin:close" if opened else "admin:open",
+                            style="danger" if opened else "success",
+                        )
+                    ],
+                    [
+                        button("💬 Поддержка", "setting:support"),
+                        button("📄 Условия", "setting:terms"),
+                    ],
+                    back("admin", "Управление"),
+                ),
+                edit=True,
+            )
+        elif page == "admin:stats":
+            totals = store.shop_totals()
+            rows = [
+                ("Всего заказов", str(totals["orders"])),
+                ("Покупателей с заказами", str(totals["buyers"])),
+                ("Выдано", str(totals["delivered"])),
+                ("Возвратов", str(totals["refunds"])),
+                ("Принято XTR", price(totals["received_xtr"])),
+                ("Возвращено XTR", price(totals["returned_xtr"])),
+            ]
+            plain = "\n".join(f"{label}  <b>{value}</b>" for label, value in rows)
+            await screen(
+                query.message,
+                f"<b>📊 Статистика за всё время</b>\n\n<blockquote>{plain}</blockquote>",
+                keys([button("↻ Обновить", "admin:stats")], back("admin", "Управление")),
+                edit=True,
+                rich=rich_table("Статистика за всё время", rows) if config.rich_menus else None,
+            )
+        elif page == "admin:system":
+            proxy = "через прокси" if config.telegram_proxy else "напрямую"
+            fragment = "сессия задана" if config.cookies else "сессия не задана"
+            await screen(
+                query.message,
+                f"<b>🛠 Система</b>\n\n<blockquote>Режим  <code>{config.mode}</code>\n"
+                f"Telegram  {proxy}\nFragment  {fragment}\nАдминистраторов  {len(config.admin_ids)}</blockquote>",
+                keys(back("admin", "Управление")),
+                edit=True,
+            )
+        elif page == "admin:search":
+            await state.set_state(AdminInput.search)
+            await screen(
+                query.message,
+                "<b>🔎 Поиск заказов</b>\n\nПришлите номер заказа, @username получателя или Telegram ID покупателя.",
+                keys(back("admin:queue", "К заказам")),
+                edit=True,
+            )
         elif page == "admin:catalog":
             await inventory(query.message, edit=True)
         elif page == "admin:brand":
@@ -210,6 +375,30 @@ def admin_router(
                 keys(back("admin", "Управление")),
                 edit=True,
             )
+
+    @router.callback_query(F.data.startswith("adminorders:") | F.data.startswith("adminsearch:"))
+    async def order_pages(query: CallbackQuery, state: FSMContext) -> None:
+        await query.answer()
+        admin_only(config, query.from_user.id)
+        await state.clear()
+        action, first, second = query.data.split(":", 2)
+        if action == "adminsearch":
+            await orders_page(
+                query.message, group="all", page=number(first, "Страница"), search=second, edit=True
+            )
+        else:
+            await orders_page(
+                query.message, group=first, page=number(second, "Страница"), edit=True
+            )
+
+    @router.message(AdminInput.search, F.text, ~F.text.startswith("/"))
+    async def search_orders(message: Message, state: FSMContext) -> None:
+        admin_only(config, message.from_user.id)
+        search = message.text.strip().lstrip("@#").lower()
+        if not re.fullmatch(r"[a-z0-9_]{1,32}", search):
+            raise ShopError("Введите номер заказа, username или Telegram ID.")
+        await state.clear()
+        await orders_page(message, group="all", search=search)
 
     @router.callback_query(F.data.startswith("setting:"))
     async def edit_setting(query: CallbackQuery, state: FSMContext) -> None:
@@ -351,7 +540,7 @@ def admin_router(
     async def admin_list(message: Message, command: CommandObject) -> None:
         admin_only(config, message.from_user.id)
         if command.command == "pending":
-            await queue(message)
+            await orders_page(message)
         else:
             await payment_errors(message)
 
@@ -360,8 +549,17 @@ def admin_router(
         await query.answer()
         admin_only(config, query.from_user.id)
         await state.clear()
+        _, order_id, *context = query.data.split(":", 3)
+        source = ""
+        if len(context) == 2 and context[0] in ORDER_SECTIONS:
+            source = f":{context[0]}:{number(context[1], 'Страница')}"
         await show_order(
-            query.message, store.get(query.data.split(":", 1)[1]), admin=True, edit=True
+            query.message,
+            store.get(order_id),
+            admin=True,
+            edit=True,
+            icons=config.premium_icons,
+            source=source,
         )
 
     @router.callback_query(F.data.startswith("ask:"))
@@ -394,7 +592,13 @@ def admin_router(
         admin_only(config, query.from_user.id)
         _, action, order_id = query.data.split(":", 2)
         if action == "approve":
-            await show_order(query.message, store.approve(order_id), admin=True, edit=True)
+            await show_order(
+                query.message,
+                store.approve(order_id),
+                admin=True,
+                edit=True,
+                icons=config.premium_icons,
+            )
         elif action == "refund":
             order = store.get(order_id)
 
@@ -402,7 +606,7 @@ def admin_router(
                 try:
                     updated = await fulfillment.refund(order.id, checkout.gateway)
                     await notify(query.bot, updated)
-                    await show_order(query.message, updated, admin=True)
+                    await show_order(query.message, updated, admin=True, icons=config.premium_icons)
                 except ShopError as exc:
                     await query.message.answer(str(exc))
 
@@ -445,7 +649,7 @@ def admin_router(
         if outcome not in {"delivered", "not_broadcast"}:
             raise ShopError("Результат должен быть delivered или not_broadcast.")
         order = await fulfillment.resolve_prepared(order_id, outcome, evidence)
-        await show_order(message, order, admin=True)
+        await show_order(message, order, admin=True, icons=config.premium_icons)
         await notify(message.bot, order)
 
     @router.message(Command("reconcile"))
@@ -456,7 +660,7 @@ def admin_router(
         async def check() -> None:
             try:
                 updated = await fulfillment.reconcile(order.id)
-                await show_order(message, updated, admin=True)
+                await show_order(message, updated, admin=True, icons=config.premium_icons)
                 if updated.state == "delivered" and order.state != "delivered":
                     await notify(message.bot, updated)
             except ShopError as exc:

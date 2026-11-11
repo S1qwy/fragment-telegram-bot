@@ -33,6 +33,8 @@ class Config:
     telegram_proxy: str | None = field(default=None, repr=False)
     fragment_proxy: str | None = field(default=None, repr=False)
     banner_path: Path | None = DEFAULT_BANNER
+    premium_icons: bool = True
+    rich_menus: bool = True
 
     @property
     def bot_id(self) -> int:
@@ -93,4 +95,6 @@ class Config:
             telegram_proxy=os.getenv("TELEGRAM_PROXY", "").strip() or None,
             fragment_proxy=os.getenv("FRAGMENT_PROXY", "").strip() or None,
             banner_path=None if banner_setting.lower() == "off" else banner,
+            premium_icons=os.getenv("SHOP_PREMIUM_ICONS", "1").strip() != "0",
+            rich_menus=os.getenv("SHOP_RICH_MENUS", "1").strip() != "0",
         )

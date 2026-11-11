@@ -696,7 +696,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "aiogram", extras = ["proxy"], specifier = ">=3.22,<4" },
+    { name = "aiogram", extras = ["proxy"], specifier = ">=3.29,<4" },
     { name = "fragment-api-py", git = "https://github.com/S1qwy/fragment-api-py.git?rev=04a0601b6cc7f11af0291683ddd773b2d96eb689" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8,<10" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.26,<2" },

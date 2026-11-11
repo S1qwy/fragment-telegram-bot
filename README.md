@@ -41,6 +41,8 @@ uv run fragment-bot run
 - `/product stars 50 100`, `/product premium 3 950`, `/product ton 1 350` добавляют позиции. Последнее число — цена в XTR. `/unlist stars 50` скрывает позицию, `/set open 1` открывает магазин.
 - `/pending` показывает очередь. Через `/order ID` администратор подтверждает выдачу или возврат. Через `/reconcile ID` проверяет исходную операцию Fragment. `/paymenterrors` показывает поступившие платежи, которые не удалось связать со счётом.
 
+В админ-панели есть вкладки заказов, поиск по номеру, получателю или Telegram ID, история платежей XTR и статистика по базе магазина. Панель поддерживает таблицы Rich Messages, как в [Bedolaga](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/blob/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/utils/rich_menu.py). Набор иконок составлен по [Telegram Premium Emojis](https://github.com/abbosahmad/telegram-premium-emojis#-catalog--top-25-essential-ids) и публичному набору [TgAndroidIcons](https://t.me/addemoji/TgAndroidIcons). На боте, которому Telegram разрешает пользовательские эмодзи, они отображаются в кнопках. При ошибке рендер переключается на обычное меню. Через `SHOP_RICH_MENUS=0` и `SHOP_PREMIUM_ICONS=0` их можно выключить.
+
 ## Управление из консоли
 
 ```sh

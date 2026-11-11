@@ -153,3 +153,24 @@ async def test_demo_fulfillment_for_every_product(tmp_path, kind, quantity, pric
     else:
         assert result.state == "delivered"
         assert result.transaction_id == f"test-{order.id}"
+
+
+async def test_admin_order_pages_and_xtr_totals(tmp_path):
+    store, checkout, first = create_checkout(tmp_path)
+    for index in range(8):
+        checkout.create(99, first.product, f"sample{index}", "")
+    DemoGateway.pay(checkout, first.id, first.buyer)
+    fulfillment = Fulfillment(Config("demo", tmp_path), store)
+    await fulfillment.refund(first.id, checkout.gateway)
+
+    first_page, total, page = store.admin_orders("all")
+    last_page, _, last = store.admin_orders("all", 99)
+    assert len(first_page) == 7 and len(last_page) == 2
+    assert (total, page, last) == (9, 0, 1)
+    assert store.admin_orders("all", search=first.id[:6])[0][0].id == first.id
+    assert store.admin_orders("all", search=str(first.buyer))[0][0].id == first.id
+    assert store.admin_orders("queue")[1] == 0
+    assert store.admin_orders("closed")[1] == 1
+    assert store.admin_orders("payments")[1] == 1
+    totals = store.shop_totals()
+    assert (totals["received_xtr"], totals["returned_xtr"], totals["buyers"]) == (100, 100, 2)

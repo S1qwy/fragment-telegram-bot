@@ -68,6 +68,16 @@ CREATE TABLE IF NOT EXISTS payment_exceptions (
 );
 """
 
+PENDING_STATES = ("paid", "queued", "sending", "review", "prepared", "prepared_void", "refunding")
+ADMIN_ORDER_FILTERS = {
+    "all": "1",
+    "queue": "state IN (" + ", ".join(f"'{state}'" for state in PENDING_STATES) + ")",
+    "review": "state IN ('review','prepared','prepared_void','refunding')",
+    "closed": "state IN ('delivered','refunded')",
+    "payments": "charge_id IS NOT NULL",
+}
+ADMIN_PAGE_SIZE = 7
+
 STATUS = {
     "unpaid": "Ожидает оплаты",
     "paid": "Оплачен, ждёт проверки магазина",
@@ -266,12 +276,50 @@ class Store:
                 )
             elif pending:
                 rows = db.execute(
-                    "SELECT * FROM orders WHERE state IN ('paid','queued','sending','review','prepared','prepared_void','refunding') "
+                    f"SELECT * FROM orders WHERE {ADMIN_ORDER_FILTERS['queue']} "
                     "ORDER BY rowid ASC LIMIT 10"
                 )
             else:
                 rows = db.execute("SELECT * FROM orders ORDER BY rowid DESC LIMIT 10")
             return [Order(**row) for row in rows]
+
+    def admin_orders(
+        self, group: str, page: int = 0, *, search: str = ""
+    ) -> tuple[list[Order], int, int]:
+        condition = ADMIN_ORDER_FILTERS.get(group)
+        if condition is None:
+            raise ShopError("Раздел заказов недоступен.")
+        params = ()
+        if search:
+            condition += " AND (instr(id, ?) = 1 OR recipient = ? OR CAST(buyer AS TEXT) = ?)"
+            params = (search, search, search)
+        with self.connection() as db:
+            db.execute("BEGIN")
+            total = db.execute(f"SELECT count(*) FROM orders WHERE {condition}", params).fetchone()[
+                0
+            ]
+            page = min(max(page, 0), max(total - 1, 0) // ADMIN_PAGE_SIZE)
+            direction = "ASC" if group == "queue" else "DESC"
+            rows = db.execute(
+                f"SELECT * FROM orders WHERE {condition} ORDER BY rowid {direction} LIMIT ? OFFSET ?",
+                (*params, ADMIN_PAGE_SIZE, page * ADMIN_PAGE_SIZE),
+            )
+            return [Order(**row) for row in rows], total, page
+
+    def shop_totals(self) -> dict[str, int]:
+        with self.connection() as db:
+            row = db.execute(
+                "SELECT count(*) AS orders, count(DISTINCT buyer) AS buyers, "
+                f"count(CASE WHEN {ADMIN_ORDER_FILTERS['queue']} THEN 1 END) AS pending, "
+                "count(CASE WHEN state='delivered' THEN 1 END) AS delivered, "
+                "count(CASE WHEN state='refunded' THEN 1 END) AS refunds, "
+                "count(CASE WHEN charge_id IS NOT NULL THEN 1 END) AS payments, "
+                "coalesce(sum(CASE WHEN currency='XTR' AND charge_id IS NOT NULL THEN price END),0) AS received_xtr, "
+                "coalesce(sum(CASE WHEN currency='XTR' AND state='refunded' THEN price END),0) AS returned_xtr, "
+                "(SELECT count(*) FROM payment_exceptions WHERE refunded_at IS NULL) AS unmatched "
+                "FROM orders"
+            ).fetchone()
+            return dict(row)
 
     def reserve_checkout(
         self, order_id: str, buyer: int, price: int, query_id: str, *, provider: str, currency: str
@@ -389,12 +437,13 @@ class Store:
                 raise ShopError("Возврат недоступен. Проверьте статус выдачи через Fragment.")
             return Order(**row)
 
-    def payment_exceptions(self) -> list[dict]:
+    def payment_exceptions(self, *, pending_only: bool = False) -> list[dict]:
+        condition = "WHERE refunded_at IS NULL" if pending_only else ""
         with self.connection() as db:
             return [
                 dict(row)
                 for row in db.execute(
-                    "SELECT * FROM payment_exceptions ORDER BY rowid DESC LIMIT 20"
+                    f"SELECT * FROM payment_exceptions {condition} ORDER BY rowid DESC LIMIT 20"
                 )
             ]
 

@@ -1,3 +1,4 @@
+from functools import partial
 from html import escape
 from secrets import token_hex
 
@@ -13,7 +14,7 @@ from .catalog import Product, username
 from .config import Config, ShopError
 from .fulfillment import Fulfillment
 from .payments import Checkout, DemoGateway
-from .store import Store
+from .store import STATUS, Store
 from .views import (
     PRODUCTS,
     STATUS_ICONS,
@@ -26,7 +27,9 @@ from .views import (
     order_card,
     package,
     price,
-    screen,
+)
+from .views import (
+    screen as render_screen,
 )
 
 
@@ -39,6 +42,7 @@ def shop_router(
     config: Config, store: Store, checkout: Checkout, fulfillment: Fulfillment
 ) -> Router:
     router = Router()
+    screen = partial(render_screen, icons=config.premium_icons)
     router.message.filter(F.chat.type == "private", F.from_user)
     router.callback_query.filter(
         lambda query: isinstance(query.message, Message) and query.message.chat.type == "private"
@@ -48,15 +52,25 @@ def shop_router(
     async def home(message: Message, user: User, *, edit: bool = False) -> None:
         settings = store.settings()
         rows = [
-            [button("🛍 Каталог", "catalog", style="primary")],
+            [button("🏪 Купить", "catalog", style="primary")],
             [button("👤 Мои заказы", "orders"), button("💬 Поддержка", "support")],
         ]
+        if settings["terms"]:
+            rows.append([button("📄 Условия магазина", "terms")])
+        orders = store.orders(buyer=user.id)
+        last = ""
+        if orders:
+            order = orders[0]
+            last = (
+                f"\n\n<blockquote>Последний заказ  <code>#{escape(order.id)}</code>\n"
+                f"{STATUS_ICONS[order.state]} {STATUS[order.state]}</blockquote>"
+            )
         if user.id in config.admin_ids:
             rows.append([button("⚙️ Управление магазином", "admin")])
         await screen(
             message,
             f"<b>{escape(settings['name'])}</b>\n\n{escape(settings['welcome'])}"
-            f"{mode_note(config.mode)}",
+            f"{last}{mode_note(config.mode)}",
             keys(*rows),
             edit=edit,
             banner=config.banner_path,
@@ -188,13 +202,13 @@ def shop_router(
         order = store.get(
             (command.args or "").strip(), buyer=None if admin else message.from_user.id
         )
-        await show_order(message, order, admin=admin)
+        await show_order(message, order, admin=admin, icons=config.premium_icons)
 
     @router.callback_query(F.data.startswith("show:"))
     async def order_callback(query: CallbackQuery) -> None:
         await query.answer()
         order = store.get(query.data.split(":", 1)[1], buyer=query.from_user.id)
-        await show_order(query.message, order, edit=True)
+        await show_order(query.message, order, edit=True, icons=config.premium_icons)
 
     async def ask_recipient(query: CallbackQuery, state: FSMContext, product: Product) -> None:
         await state.set_data(

@@ -3,13 +3,15 @@ from unittest.mock import AsyncMock
 
 import pytest
 from aiogram import Bot, Dispatcher
-from aiogram.exceptions import TelegramNetworkError
+from aiogram.exceptions import TelegramBadRequest, TelegramNetworkError, TelegramNotFound
 from aiogram.methods import (
     AnswerCallbackQuery,
     EditMessageCaption,
+    EditMessageText,
     SendDocument,
     SendMessage,
     SendPhoto,
+    SendRichMessage,
 )
 from aiogram.types import (
     CallbackQuery,
@@ -78,6 +80,8 @@ async def test_demo_bot_checkout_and_admin_actions(tmp_path):
         assert isinstance(home, SendPhoto)
         assert "<b>Fragment Shop</b>" in home.caption
         assert home.reply_markup.inline_keyboard[0][0].style == "primary"
+        assert home.reply_markup.inline_keyboard[0][0].icon_custom_emoji_id
+        assert home.reply_markup.inline_keyboard[0][0].text == "Купить"
         assert all(
             button.callback_data != "admin"
             for row in home.reply_markup.inline_keyboard
@@ -122,6 +126,26 @@ async def test_demo_bot_checkout_and_admin_actions(tmp_path):
         await callback("admin", user=ADMIN)
         dashboard = bot.session.make_request.await_args.args[1]
         assert dashboard.reply_markup.inline_keyboard[0][0].callback_data == "admin:queue"
+        assert isinstance(dashboard, EditMessageText)
+        assert "<table>" in dashboard.rich_message.html
+        await callback("admin:search", user=ADMIN)
+        await dispatcher.feed_update(
+            bot, Update(update_id=8, message=chat_message("@sample", user=ADMIN))
+        )
+        search = bot.session.make_request.await_args.args[1]
+        assert (
+            search.reply_markup.inline_keyboard[0][0].callback_data
+            == f"adminorder:{order.id}:all:0"
+        )
+        await callback("admin:payments", user=ADMIN)
+        payments = bot.session.make_request.await_args.args[1]
+        assert "100 ⭐" in payments.rich_message.html
+        await callback("adminorders:payments:0", user=ADMIN)
+        payment = bot.session.make_request.await_args.args[1]
+        assert (
+            payment.reply_markup.inline_keyboard[0][0].callback_data
+            == f"adminorder:{order.id}:payments:0"
+        )
         await callback("admin:queue", user=ADMIN)
         queue = bot.session.make_request.await_args.args[1]
         assert queue.reply_markup.inline_keyboard[0][0].callback_data == f"adminorder:{order.id}"
@@ -226,5 +250,40 @@ async def test_start_falls_back_to_menu_when_banner_upload_times_out(tmp_path):
             assert isinstance(menu, SendMessage)
             assert menu.text == photo.caption
             assert menu.reply_markup == photo.reply_markup
+        finally:
+            await dispatcher.fsm.close()
+
+
+async def test_admin_falls_back_from_rich_and_unavailable_custom_icons(tmp_path):
+    config = Config("demo", tmp_path, token="123:dummy", admin_ids=frozenset({ADMIN.id}))
+    store = Store(tmp_path, config.mode)
+    bot = Bot(config.token)
+    async with bot:
+
+        async def request(_bot, method, timeout=None):
+            if isinstance(method, SendRichMessage):
+                raise TelegramNotFound(method=method, message="method not found")
+            if (
+                isinstance(method, SendMessage)
+                and method.reply_markup.inline_keyboard[0][0].icon_custom_emoji_id
+            ):
+                raise TelegramBadRequest(method=method, message="BUTTON_CUSTOM_EMOJI_INVALID")
+            return True
+
+        bot.session.make_request = AsyncMock(side_effect=request)
+        checkout = Checkout(store, DemoGateway(bot))
+        dispatcher = Dispatcher()
+        dispatcher.include_router(shop_router(config, store, checkout, Fulfillment(config, store)))
+        try:
+            await dispatcher.feed_update(
+                bot, Update(update_id=1, message=chat_message("/admin", user=ADMIN))
+            )
+            rich, premium, classic = (
+                call.args[1] for call in bot.session.make_request.await_args_list
+            )
+            assert isinstance(rich, SendRichMessage)
+            assert isinstance(premium, SendMessage)
+            assert classic.reply_markup.inline_keyboard[0][0].text == "🧾 Заказы"
+            assert classic.reply_markup.inline_keyboard[0][0].callback_data == "admin:queue"
         finally:
             await dispatcher.fsm.close()
