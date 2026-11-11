@@ -1,0 +1,39 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fragment-telegram-bot"
+version = "0.1.0"
+description = "Self-hosted Telegram storefront powered by fragment-api-py"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+dependencies = [
+    "aiogram>=3.22,<4",
+    "fragment-api-py @ git+https://github.com/S1qwy/fragment-api-py.git@04a0601b6cc7f11af0291683ddd773b2d96eb689",
+    "python-dotenv>=1.1,<2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10", "pytest-asyncio>=0.26,<2", "ruff>=0.12,<1"]
+
+[project.scripts]
+fragment-bot = "fragment_bot.cli:main"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["fragment_bot"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "UP", "B"]

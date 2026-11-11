@@ -1,0 +1,70 @@
+# Fragment Telegram Bot
+
+White-label витрина для продажи подарочных Telegram Stars, Telegram Premium и пополнения GRAM для Telegram Ads через [fragment-api-py](https://github.com/S1qwy/fragment-api-py). Каждый владелец разворачивает свой экземпляр с собственным ботом, названием, каталогом и ценами.
+
+| Товар | Что получает покупатель |
+| --- | --- |
+| `stars` | Подарочные Telegram Stars на аккаунт по публичному @username |
+| `premium` | Подарочный Telegram Premium на 3, 6 или 12 месяцев |
+| `ton` | GRAM на баланс Telegram Ads для получателя, которого находит Fragment |
+
+Перевод GRAM в Telegram Wallet или на произвольный TON-адрес требует другой операции. Оплата цифровых товаров внутри бота идёт в XTR по [правилам Telegram](https://core.telegram.org/bots/payments-stars). Цена в каталоге задаётся в целых XTR, а выдача в live оплачивается с отдельного TON-кошелька владельца.
+
+## Запуск
+
+Нужны Python 3.11+, Git и [uv](https://docs.astral.sh/uv/). Возьмите токен у [@BotFather](https://t.me/BotFather) и укажите свой числовой Telegram ID в `ADMIN_IDS`. Для нескольких администраторов перечислите ID через запятую.
+
+```sh
+git clone --branch dev https://github.com/S1qwy/fragment-telegram-bot.git
+cd fragment-telegram-bot
+cp .env.example .env
+uv sync --locked
+uv run fragment-bot run
+```
+
+В PowerShell для копирования используйте `Copy-Item .env.example .env`. С Docker Compose после заполнения `.env` запустите `docker compose up --build -d`. Команды управления доступны через `docker compose exec bot fragment-bot …`. Используйте один процесс Telegram polling на токен. SQLite с каталогом, платежами, заказами и журналом SDK хранится в `DATA_DIR` либо в томе Compose `shop-data`.
+
+| Режим | Оплата | Выдача |
+| --- | --- | --- |
+| `demo` | Кнопка имитации или CLI | Имитация |
+| `test` | XTR в [тестовой среде Telegram](https://core.telegram.org/bots/features#dedicated-test-environment), отдельный тестовый токен | Имитация |
+| `live` | Реальные XTR | Fragment после подтверждения оператором |
+
+Для каждого режима и каждого токена используйте свой каталог данных. В `demo` и `test` каталог заполнен примерами. В `live` витрина закрыта до настройки каталога, условий и контакта поддержки. Данные SDK берутся из `.env` или переменных среды. Сессию можно подготовить по [документации SDK](https://github.com/S1qwy/fragment-api-py/wiki/Client-and-Authentication). Нужны пользовательские `FRAGMENT_COOKIES` с `stel_ton_token`, `TON_SEED` отдельного кошелька и `TON_API_KEY`. Перепроверьте кошелёк, комиссию SDK и лимит `FRAGMENT_MAX_TON`. Лимит применяется к фактической подготовленной операции с комиссией и резервом перед отправкой. SDK устанавливается из закреплённого Git-коммита v14.4.1.
+
+## Управление в Telegram
+
+- Покупатель открывает `/catalog`, выбирает пакет, вводит @username и подтверждает условия. Счёт привязан к заказу и покупателю. История доступна через `/orders`, помощь с платежами через `/paysupport`.
+- Администратор открывает `/admin` и меняет настройки через `/set name`, `/set welcome`, `/set support`, `/set terms`. Имя и аватар аккаунта самого бота настраиваются в BotFather.
+- `/product stars 50 100`, `/product premium 3 950`, `/product ton 1 350` добавляют позиции. Последнее число — цена в XTR. `/unlist stars 50` скрывает позицию, `/set open 1` открывает магазин.
+- `/pending` показывает очередь. Через `/order ID` администратор подтверждает выдачу или возврат. Через `/reconcile ID` проверяет исходную операцию Fragment. `/paymenterrors` показывает поступившие платежи, которые не удалось связать со счётом.
+
+## Управление из консоли
+
+```sh
+uv run fragment-bot --help
+uv run fragment-bot doctor
+uv run fragment-bot set name "Мой магазин"
+uv run fragment-bot product stars 50 100
+uv run fragment-bot demo-buy stars 50 @example
+uv run fragment-bot orders --pending
+uv run fragment-bot approve ORDER_ID --now
+uv run fragment-bot order ORDER_ID
+```
+
+Пример `demo-buy` работает без токена Telegram. Без `--now` команда `approve` ставит заказ в очередь запущенного бота. Для live сессии есть `doctor --online`. Для возврата используйте `refund ORDER_ID`. При неизвестном результате выдачи проверьте `reconcile ORDER_ID`. После независимой проверки операции в блокчейне можно записать `resolve ORDER_ID settled --evidence "…"` или `resolve ORDER_ID not_broadcast --evidence "…"`. `settled` отражает факт обработки транзакции в блокчейне. Для статуса выдачи требуется подтверждение Fragment. После `not_broadcast` доступен возврат. Операция с неизвестным исходом автоматически повторно не отправляется. Команда `retry ORDER_ID` возвращает в очередь только попытку без записанной операции Fragment. Для сверки платежей вне заказов есть `payment-errors` и `refund-payment-error CHARGE_ID`.
+
+## Интеграция платежей и источник логики
+
+Проект опирается на архитектуру [Remnawave Bedolaga Telegram Bot](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot). Разделение провайдера, общей обработки платежа и выдачи адаптировано из [платёжных модулей](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/tree/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/services/payment), [обработчика Stars](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/blob/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/handlers/stars_payments.py) и [маршрутизации вебхуков](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/blob/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/webserver/payments.py). Реализация написана для этого магазина. Выдача работает через [fragment-api-py](https://github.com/S1qwy/fragment-api-py).
+
+[Как добавить платёжный адаптер](docs/payments.md).
+
+## Проверки
+
+```sh
+uv sync --locked --extra dev
+uv run ruff check .
+uv run ruff format --check .
+uv run pytest
+```

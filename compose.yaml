@@ -1,0 +1,13 @@
+services:
+  bot:
+    build: .
+    env_file: .env
+    environment:
+      DATA_DIR: /app/data
+    volumes:
+      - shop-data:/app/data
+    restart: unless-stopped
+    stop_grace_period: 35s
+
+volumes:
+  shop-data:
