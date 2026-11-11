@@ -37,7 +37,7 @@ uv run fragment-bot run
 ## Управление в Telegram
 
 - Покупатель открывает `/catalog`, выбирает пакет, вводит @username и подтверждает условия. Счёт привязан к заказу и покупателю. История доступна через `/orders`, помощь с платежами через `/paysupport`.
-- Администратор открывает `/admin` и меняет настройки через `/set name`, `/set welcome`, `/set support`, `/set terms`. Имя и аватар аккаунта самого бота настраиваются в BotFather.
+- Администратор открывает `/admin` и меняет настройки через `/set name`, `/set welcome`, `/set support`, `/set terms`. Разделы «Товары» и «Оформление» доступны кнопками в админке. Обложку можно заменить через `SHOP_BANNER_FILE` или скрыть значением `off`. Имя и аватар аккаунта самого бота настраиваются в BotFather.
 - `/product stars 50 100`, `/product premium 3 950`, `/product ton 1 350` добавляют позиции. Последнее число — цена в XTR. `/unlist stars 50` скрывает позицию, `/set open 1` открывает магазин.
 - `/pending` показывает очередь. Через `/order ID` администратор подтверждает выдачу или возврат. Через `/reconcile ID` проверяет исходную операцию Fragment. `/paymenterrors` показывает поступившие платежи, которые не удалось связать со счётом.
 
@@ -68,7 +68,7 @@ uv run fragment-bot order ORDER_ID
 
 ## Интеграция платежей и источник логики
 
-Проект опирается на архитектуру [Remnawave Bedolaga Telegram Bot](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot). Разделение провайдера, общей обработки платежа и выдачи адаптировано из [платёжных модулей](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/tree/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/services/payment), [обработчика Stars](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/blob/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/handlers/stars_payments.py) и [маршрутизации вебхуков](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/blob/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/webserver/payments.py). Реализация написана для этого магазина. Выдача работает через [fragment-api-py](https://github.com/S1qwy/fragment-api-py).
+Проект опирается на архитектуру [Remnawave Bedolaga Telegram Bot](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot). Разделение провайдера, общей обработки платежа и выдачи адаптировано из [платёжных модулей](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/tree/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/services/payment), [обработчика Stars](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/blob/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/handlers/stars_payments.py) и [маршрутизации вебхуков](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/blob/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/webserver/payments.py). Навигация внутри сообщения и отдельные разделы админки основаны на [меню Bedolaga](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/blob/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/handlers/menu.py). Реализация написана для этого магазина. Выдача работает через [fragment-api-py](https://github.com/S1qwy/fragment-api-py).
 
 [Как добавить платёжный адаптер](docs/payments.md).
 

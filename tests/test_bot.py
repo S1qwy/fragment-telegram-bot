@@ -3,11 +3,18 @@ from unittest.mock import AsyncMock
 
 import pytest
 from aiogram import Bot, Dispatcher
-from aiogram.methods import AnswerCallbackQuery, SendDocument, SendMessage
+from aiogram.methods import (
+    AnswerCallbackQuery,
+    EditMessageCaption,
+    SendDocument,
+    SendMessage,
+    SendPhoto,
+)
 from aiogram.types import (
     CallbackQuery,
     Chat,
     Message,
+    PhotoSize,
     PreCheckoutQuery,
     SuccessfulPayment,
     Update,
@@ -26,7 +33,7 @@ BUYER = User(id=42, is_bot=False, first_name="Buyer")
 ADMIN = User(id=99, is_bot=False, first_name="Admin")
 
 
-def chat_message(text=None, *, user=BUYER, payment=None):
+def chat_message(text=None, *, user=BUYER, payment=None, photo=None):
     return Message(
         message_id=1,
         date=datetime.now(UTC),
@@ -34,6 +41,7 @@ def chat_message(text=None, *, user=BUYER, payment=None):
         from_user=user,
         text=text,
         successful_payment=payment,
+        photo=photo,
     )
 
 
@@ -48,7 +56,7 @@ async def test_demo_bot_checkout_and_admin_actions(tmp_path):
         fulfillment = Fulfillment(config, store)
         dispatcher.include_router(shop_router(config, store, checkout, fulfillment))
 
-        async def callback(data, *, user=BUYER):
+        async def callback(data, *, user=BUYER, photo=None):
             await dispatcher.feed_update(
                 bot,
                 Update(
@@ -58,21 +66,49 @@ async def test_demo_bot_checkout_and_admin_actions(tmp_path):
                         from_user=user,
                         chat_instance="chat",
                         data=data,
-                        message=chat_message(user=user),
+                        message=chat_message(user=user, photo=photo),
                     ),
                 ),
                 schedule=None,
             )
 
-        await callback("catalog")
-        await callback("buy:stars:50")
+        await dispatcher.feed_update(bot, Update(update_id=1, message=chat_message("/start")))
+        home = bot.session.make_request.await_args.args[1]
+        assert isinstance(home, SendPhoto)
+        assert "<b>Fragment Shop</b>" in home.caption
+        assert home.reply_markup.inline_keyboard[0][0].style == "primary"
+        assert all(
+            button.callback_data != "admin"
+            for row in home.reply_markup.inline_keyboard
+            for button in row
+        )
+
+        photo = [PhotoSize(file_id="image", file_unique_id="cover", width=2172, height=724)]
+        await callback("catalog", photo=photo)
+        categories = bot.session.make_request.await_args.args[1]
+        assert isinstance(categories, EditMessageCaption)
+        assert categories.reply_markup.inline_keyboard[0][0].callback_data == "category:stars"
+        await callback("category:stars", photo=photo)
+        packages = bot.session.make_request.await_args.args[1]
+        assert packages.reply_markup.inline_keyboard[0][0].callback_data == "buy:stars:50"
+        await callback("buy:stars:50", photo=photo)
         await dispatcher.feed_update(bot, Update(update_id=2, message=chat_message("@sample")))
-        preview = bot.session.make_request.await_args.args[1]
+        sent = [
+            call.args[1]
+            for call in bot.session.make_request.await_args_list
+            if isinstance(call.args[1], SendMessage)
+        ]
+        preview = sent[-1]
         assert isinstance(preview, SendMessage)
         assert "50" in preview.text and "@sample" in preview.text
         nonce_button = preview.reply_markup.inline_keyboard[0][0]
         await callback(nonce_button.callback_data)
-        invoice = bot.session.make_request.await_args.args[1]
+        sent = [
+            call.args[1]
+            for call in bot.session.make_request.await_args_list
+            if isinstance(call.args[1], SendMessage)
+        ]
+        invoice = sent[-1]
         demo_button = invoice.reply_markup.inline_keyboard[0][0]
         await callback(demo_button.callback_data)
         order = store.orders(buyer=BUYER.id)[0]
@@ -82,6 +118,14 @@ async def test_demo_bot_checkout_and_admin_actions(tmp_path):
         except ShopError:
             pass
         assert store.get(order.id).state == "paid"
+        await callback("admin", user=ADMIN)
+        dashboard = bot.session.make_request.await_args.args[1]
+        assert dashboard.reply_markup.inline_keyboard[0][0].callback_data == "admin:queue"
+        await callback("admin:queue", user=ADMIN)
+        queue = bot.session.make_request.await_args.args[1]
+        assert queue.reply_markup.inline_keyboard[0][0].callback_data == f"adminorder:{order.id}"
+        await callback(f"adminorder:{order.id}", user=ADMIN)
+        await callback(f"ask:approve:{order.id}", user=ADMIN)
         await callback(f"act:approve:{order.id}", user=ADMIN)
         assert store.get(order.id).state == "queued"
         await fulfillment.deliver(store.claim(order.id))
@@ -94,6 +138,24 @@ async def test_demo_bot_checkout_and_admin_actions(tmp_path):
         assert PreparedTransaction.model_validate_json(
             download.document.data
         ) == fulfillment.prepared(order.id)
+        await callback("admin:brand", user=ADMIN)
+        await callback("setting:name", user=ADMIN)
+        await dispatcher.feed_update(
+            bot, Update(update_id=3, message=chat_message("Store <3", user=ADMIN))
+        )
+        await callback("menu", user=ADMIN)
+        assert "<b>Store &lt;3</b>" in bot.session.make_request.await_args.args[1].text
+        await callback("admin:catalog", user=ADMIN)
+        await callback("adminitem:stars:50", user=ADMIN)
+        await callback("adminprice:stars:50", user=ADMIN)
+        await dispatcher.feed_update(
+            bot, Update(update_id=4, message=chat_message("120", user=ADMIN))
+        )
+        assert Product("stars", 50, 120) in store.products()
+        await callback("adminhide:stars:50", user=ADMIN)
+        assert Product("stars", 50, 120) in store.products()
+        await callback("adminconfirmhide:stars:50", user=ADMIN)
+        assert Product("stars", 50, 120) not in store.products()
         calls = [call.args[1] for call in bot.session.make_request.await_args_list]
         assert any(isinstance(call, AnswerCallbackQuery) for call in calls)
         await dispatcher.fsm.close()

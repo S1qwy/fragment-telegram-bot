@@ -188,13 +188,15 @@ class Store:
                 for row in db.execute("SELECT * FROM products ORDER BY kind DESC, quantity")
             ]
 
-    def list_product(self, product: Product) -> None:
+    def list_product(self, product: Product, *, existing_only: bool = False) -> None:
         with self.connection() as db:
             db.execute("BEGIN IMMEDIATE")
             existing = db.execute(
                 "SELECT 1 FROM products WHERE kind=? AND quantity=?",
                 (product.kind, product.quantity),
             ).fetchone()
+            if existing_only and not existing:
+                raise ShopError("Товар уже скрыт из каталога.")
             if not existing and db.execute("SELECT count(*) FROM products").fetchone()[0] >= 30:
                 raise ShopError("В каталоге может быть до 30 позиций.")
             db.execute(

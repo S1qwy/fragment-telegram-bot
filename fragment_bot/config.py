@@ -9,6 +9,7 @@ from typing import Literal, cast
 from dotenv import load_dotenv
 
 Mode = Literal["demo", "test", "live"]
+DEFAULT_BANNER = Path(__file__).with_name("assets") / "shop-cover.jpg"
 
 
 class ShopError(ValueError):
@@ -31,6 +32,7 @@ class Config:
     max_nanoton: int = 10_000_000_000
     telegram_proxy: str | None = field(default=None, repr=False)
     fragment_proxy: str | None = field(default=None, repr=False)
+    banner_path: Path | None = DEFAULT_BANNER
 
     @property
     def bot_id(self) -> int:
@@ -73,6 +75,8 @@ class Config:
                 ) from None
             if not isinstance(account, dict):
                 raise ShopError("TON_SENDER_ACCOUNT должен быть JSON-объектом TON Connect.")
+        banner_setting = os.getenv("SHOP_BANNER_FILE", "").strip()
+        banner = Path(banner_setting).expanduser() if banner_setting else DEFAULT_BANNER
         return cls(
             mode=cast(Mode, mode),
             data_dir=Path(os.getenv("DATA_DIR", "data")).expanduser().resolve(),
@@ -88,4 +92,5 @@ class Config:
             max_nanoton=int(nanoton),
             telegram_proxy=os.getenv("TELEGRAM_PROXY", "").strip() or None,
             fragment_proxy=os.getenv("FRAGMENT_PROXY", "").strip() or None,
+            banner_path=None if banner_setting.lower() == "off" else banner,
         )

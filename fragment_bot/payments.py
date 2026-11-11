@@ -4,13 +4,15 @@ from typing import Protocol
 from aiogram import Bot
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.client.telegram import TelegramAPIServer
+from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramAPIError, TelegramBadRequest
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice
+from aiogram.types import InlineKeyboardButton, LabeledPrice
 from aiogram.utils.token import TokenValidationError
 
 from .catalog import Product, username
 from .config import Config, ShopError
 from .store import Order, Store
+from .views import back, button, keys, order_card, price
 
 
 @dataclass(frozen=True)
@@ -81,15 +83,11 @@ class DemoGateway:
             raise ShopError("Для отправки счёта нужен запущенный бот.")
         await self.bot.send_message(
             order.buyer,
-            f"Тестовый счёт · {order.price} XTR\nЗаказ #{order.id}",
-            reply_markup=InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text="Имитировать оплату", callback_data=f"demo:{order.id}"
-                        )
-                    ]
-                ]
+            "<b>🧪 Тестовый счёт</b>\n\n" + order_card(order),
+            parse_mode=ParseMode.HTML,
+            reply_markup=keys(
+                [button("💳 Имитировать оплату", f"demo:{order.id}", style="success")],
+                back("orders", "К заказам"),
             ),
         )
 
@@ -125,6 +123,14 @@ class TelegramStarsGateway:
             prices=[LabeledPrice(label=order.product.label, amount=order.price)],
             provider_token="",
             start_parameter=f"order-{order.id}",
+            reply_markup=keys(
+                [
+                    InlineKeyboardButton(
+                        text=f"Оплатить {price(order.price)}", pay=True, style="success"
+                    )
+                ],
+                back("orders", "К заказам"),
+            ),
         )
 
     async def refund(self, buyer: int, charge_id: str) -> None:
