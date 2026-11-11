@@ -1,18 +1,16 @@
 # Fragment Telegram Bot
 
-White-label витрина для продажи подарочных Telegram Stars, Telegram Premium и пополнения GRAM для Telegram Ads через [fragment-api-py](https://github.com/S1qwy/fragment-api-py). Каждый владелец разворачивает свой экземпляр с собственным ботом, названием, каталогом и ценами.
+A self-hosted, white-label Telegram storefront powered by [fragment-api-py](https://github.com/S1qwy/fragment-api-py). Each operator runs their own bot, branding, prices, customer support and TON wallet.
 
-| Товар | Что получает покупатель |
+| Product | Delivery |
 | --- | --- |
-| `stars` | Подарочные Telegram Stars на аккаунт по публичному @username |
-| `premium` | Подарочный Telegram Premium на 3, 6 или 12 месяцев |
-| `ton` | GRAM на баланс Telegram Ads для получателя, которого находит Fragment |
+| Telegram Stars | Gifts to a public Telegram username; live orders return an unsigned `PreparedTransaction` for external signing |
+| Telegram Premium | Gift subscriptions for 3, 6 or 12 months |
+| GRAM | Telegram Ads balance top-ups supported by Fragment; not arbitrary TON transfers or Telegram Wallet deposits |
 
-Перевод GRAM в Telegram Wallet или на произвольный TON-адрес требует другой операции. Оплата цифровых товаров внутри бота идёт в XTR по [правилам Telegram](https://core.telegram.org/bots/payments-stars). Цена в каталоге задаётся в целых XTR, а выдача в live оплачивается с отдельного TON-кошелька владельца.
+## Quick start
 
-## Запуск
-
-Нужны Python 3.11+, Git и [uv](https://docs.astral.sh/uv/). Возьмите токен у [@BotFather](https://t.me/BotFather) и укажите свой числовой Telegram ID в `ADMIN_IDS`. Для нескольких администраторов перечислите ID через запятую.
+Requires Python 3.11+, Git and [uv](https://docs.astral.sh/uv/).
 
 ```sh
 git clone --branch dev https://github.com/S1qwy/fragment-telegram-bot.git
@@ -22,63 +20,116 @@ uv sync --locked
 uv run fragment-bot run
 ```
 
-В PowerShell для копирования используйте `Copy-Item .env.example .env`. С Docker Compose после заполнения `.env` запустите `docker compose up --build -d`. Команды управления доступны через `docker compose exec bot fragment-bot …`. Используйте один процесс Telegram polling на токен. SQLite с каталогом, платежами, заказами и журналом SDK хранится в `DATA_DIR` либо в томе Compose `shop-data`.
+In PowerShell, copy the configuration with `Copy-Item .env.example .env`. Set `BOT_TOKEN` and at least one numeric Telegram user ID in `ADMIN_IDS`. Multiple admins may be separated by commas. Open `/admin` in the bot to configure the storefront. The bot account's name and avatar are managed through BotFather.
 
-При запуске через локальный прокси укажите его URL в `TELEGRAM_PROXY` и `FRAGMENT_PROXY`. Для процесса на той же машине подойдёт URL вида `http://127.0.0.1:10809`. В Docker укажите адрес прокси, доступный из контейнера.
+Alternatively, fill in `.env` and run `docker compose up --build -d`. Run management commands with `docker compose exec bot fragment-bot ...`. SQLite data is stored in `DATA_DIR` or the Compose `shop-data` volume. Run one polling process per bot token and back up the data directory.
 
-Если Telegram или прокси временно недоступны, процесс бота остаётся запущенным и повторяет подключение. При старте пауза между попытками растёт до 30 секунд. Polling сохраняет текущий offset, а сбой уведомления покупателя не повторяет уже записанную выдачу. Сам прокси должен быть включён отдельно.
+## Modes and live setup
 
-| Режим | Оплата | Выдача |
+| `SHOP_MODE` | Customer payment | Fulfillment |
 | --- | --- | --- |
-| `demo` | Кнопка имитации или CLI | Имитация |
-| `test` | XTR в [тестовой среде Telegram](https://core.telegram.org/bots/features#dedicated-test-environment), отдельный тестовый токен | Имитация |
-| `live` | Реальные XTR | Stars подготавливаются для внешней подписи. Premium и GRAM выдаются автоматически после подтверждения оператором. |
+| `demo` | Simulated payment button or CLI | Simulated |
+| `test` | XTR in Telegram's dedicated test environment, using a separate test token | Simulated |
+| `live` | Real Telegram Stars (XTR) | Unsigned Stars transactions; Premium and GRAM purchases after operator approval |
 
-Для каждого режима и каждого токена используйте свой каталог данных. В `demo` и `test` каталог заполнен примерами. В `live` витрина закрыта до настройки каталога, условий и контакта поддержки. Данные SDK берутся из `.env` или переменных среды. Сессию можно подготовить по [документации SDK](https://github.com/S1qwy/fragment-api-py/wiki/Client-and-Authentication). Для Stars нужны `FRAGMENT_COOKIES` и публичный JSON аккаунта TON Connect в `TON_SENDER_ACCOUNT` (поля `address`, `chain`, `publicKey`, `walletStateInit`). Вместо публичного аккаунта можно указать `TON_SEED` для локального получения адреса. Для автоматической выдачи Premium и GRAM нужны `FRAGMENT_COOKIES` с `stel_ton_token`, `TON_SEED` отдельного кошелька и `TON_API_KEY`. Перепроверьте кошелёк, комиссию SDK и лимит `FRAGMENT_MAX_TON`. Лимит применяется к фактической подготовленной операции с комиссией и резервом перед отправкой. SDK устанавливается из закреплённого Git-коммита v14.4.1.
+Use a separate `DATA_DIR` for each mode and bot. A new live database starts closed and uses rate-based pricing. Existing databases retain their catalog and settings. Demo presets cannot be applied to a live database.
 
-## Управление в Telegram
+To prepare live mode:
 
-- Покупатель открывает `/catalog`, выбирает пакет, вводит @username и подтверждает условия. Счёт привязан к заказу и покупателю. История доступна через `/orders`, помощь с платежами через `/paysupport`.
-- Администратор открывает `/admin` и меняет настройки через `/set name`, `/set welcome`, `/set support`, `/set terms`. Разделы «Товары» и «Оформление» доступны кнопками в админке. Обложку можно заменить через `SHOP_BANNER_FILE` или скрыть значением `off`. Имя и аватар аккаунта самого бота настраиваются в BotFather.
-- `/product stars 50 100`, `/product premium 3 950`, `/product ton 1 350` добавляют позиции. Последнее число — цена в XTR. `/unlist stars 50` скрывает позицию, `/set open 1` открывает магазин.
-- `/pending` показывает очередь. Через `/order ID` администратор подтверждает выдачу или возврат. Через `/reconcile ID` проверяет исходную операцию Fragment. `/paymenterrors` показывает поступившие платежи, которые не удалось связать со счётом.
+1. Set `SHOP_MODE=live` and a separate data directory such as `DATA_DIR=data-live`.
+2. Set `FRAGMENT_COOKIES`. For Stars, supply the public TON Connect account JSON in `TON_SENDER_ACCOUNT` (`address`, `chain`, `publicKey`, `walletStateInit`). Alternatively, the SDK can derive the account from `TON_SEED`.
+3. Automatic Premium/GRAM delivery requires `TON_SEED`, `TON_API_KEY` and Fragment cookies containing `stel_ton_token`. Disable unavailable product categories before running live. Authentication details are documented in the [SDK wiki](https://github.com/S1qwy/fragment-api-py/wiki/Client-and-Authentication).
+4. Configure prices, enabled products, support details, terms and privacy information through `/admin`. Built-in prices are examples, not market quotes. Review them before opening the shop.
+5. Run `uv run fragment-bot doctor --online`, then open the storefront in `/admin`.
 
-В админ-панели есть вкладки заказов, поиск по номеру, получателю или Telegram ID, история платежей XTR и статистика по базе магазина. Панель поддерживает таблицы Rich Messages, как в [Bedolaga](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/blob/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/utils/rich_menu.py). Набор иконок составлен по [Telegram Premium Emojis](https://github.com/abbosahmad/telegram-premium-emojis#-catalog--top-25-essential-ids) и публичному набору [TgAndroidIcons](https://t.me/addemoji/TgAndroidIcons). На боте, которому Telegram разрешает пользовательские эмодзи, они отображаются в кнопках. При ошибке рендер переключается на обычное меню. Через `SHOP_RICH_MENUS=0` и `SHOP_PREMIUM_ICONS=0` их можно выключить.
+The SDK is pinned to commit `04a0601b6cc7f11af0291683ddd773b2d96eb689` (v14.4.1). `FRAGMENT_MAX_TON` limits each prepared purchase including SDK fees and gas reserve. Credentials remain in `.env` or environment variables; storefront settings are stored in SQLite.
 
-В разделе «Настройки» можно менять оформление, порядок меню и каталога, правила заказа и тексты для покупателей. Для безопасного прогона есть [готовые тестовые настройки](docs/demo-settings.md). Подход к разделам и параметрам меню основан на [конструкторе меню Bedolaga](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/blob/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/services/menu_layout/constants.py).
+If using a local proxy, set `TELEGRAM_PROXY` and `FRAGMENT_PROXY`, for example `http://127.0.0.1:10809`. A Docker container needs a proxy address reachable from that container. The proxy must run separately. Telegram connection failures are retried; startup backoff grows to 30 seconds. Polling preserves its current offset, and notification failures do not repeat completed fulfillment.
 
-## Управление из консоли
+## Rates, packages and availability
+
+Open `/admin` → Settings → Rates and products (the current bot interface is in Russian: «Настройки» → «Курсы и товары»).
+
+| Setting | Meaning | Example default |
+| --- | --- | --- |
+| `pricing_mode` | `rates` for quantity/duration pricing, `catalog` for individual catalog prices | `rates` on new live databases; `catalog` on existing/demo databases |
+| `stars_rate` | XTR charged per delivered Star | `2` |
+| `stars_packages` | Exactly five distinct Stars quantities | `50,100,250,500,1000` |
+| `stars_custom` | Enable custom Stars quantity | `1` |
+| `ton_rate` | XTR charged per GRAM | `350` |
+| `premium_price_3` | Total price for 3 months, in XTR | `950` |
+| `premium_price_6` | Total price for 6 months, in XTR | `1700` |
+| `premium_price_12` | Total price for 12 months, in XTR | `3000` |
+| `enabled_stars`, `enabled_premium`, `enabled_ton` | Enable/disable a whole product category | `1` |
+
+Rates accept up to six decimal places. Totals are computed with decimal arithmetic and rounded up to whole XTR. Quantities must be integers within the SDK limits; invoice totals must be 1–10,000 XTR. Packages exceeding this invoice limit are hidden. GRAM uses quantity entry instead of preset packages. Custom Stars use the same rate as preset packages.
+
+Prices and accepted terms are checked again when an order is created, then stored with that order. Changing a rate does not rewrite existing invoices. Disabling a category blocks new orders and pre-checkout for its unpaid invoices; captured payments remain available for fulfillment or refund.
+
+The legacy catalog remains available in `catalog` pricing mode. `/product stars 50 100` adds a package and `/unlist stars 50` removes it. These individual package prices do not override rate-based pricing.
+
+## Branding and administration
+
+The settings panel also controls the shop name, welcome text, tagline, buy button, home button order/visibility, category order, homepage layout, banner URL, recent order panel, gift recipient policy, invoice lifetime, sender visibility, support link, terms, FAQ and privacy text. All persistent settings are also accessible through the CLI.
+
+The admin panel includes order filters, search by order ID/recipient/buyer ID, payment history, statistics, fulfillment approval, reconciliation, refunds and prepared transaction downloads. Navigation uses rich tables when supported and falls back to HTML. Premium custom emoji are drawn from verified public sets, including [Telegram Premium Emojis](https://github.com/abbosahmad/telegram-premium-emojis), [TgAndroidIcons](https://t.me/addemoji/TgAndroidIcons), tgmacicons and vector_icons_by_fStikBot. `premium_only` falls back to plain text if Telegram rejects custom emoji. `SHOP_RICH_MENUS=0` and `SHOP_PREMIUM_ICONS=0` change inherited startup defaults.
+
+Replace the local banner with `SHOP_BANNER_FILE` or set it to `off`. A public HTTPS banner URL can be changed in the bot. [Demo settings and sample texts](docs/demo-settings.md) are provided for testing and should be replaced before production sales.
+
+Customer commands: `/start`, `/catalog`, `/orders`, `/order ID`, `/support`, `/paysupport`, `/terms`, `/faq`, `/privacy`, `/cancel`.
+
+## Payments: implemented providers
+
+The implemented adapters are **Telegram Stars (XTR)** and **DemoGateway**. YooKassa, CryptoBot and other Bedolaga providers are not bundled or configured. Automated tests exercise invoices, pre-checkout, receipt verification, duplicate handling and refunds; they do not prove that a particular deployment has completed a real payment.
+
+Digital goods sold inside Telegram must use XTR under [Telegram's digital goods payment rules](https://core.telegram.org/bots/payments-stars). `provider_token` is empty for XTR. The bot waits for `successful_payment`, stores the original charge ID and verifies the payer, provider, currency, amount and order. Repeated receipts do not duplicate fulfillment. Unmatched payments are kept for manual reconciliation. TON wallet funding for Fragment fulfillment is separate from the customer's XTR payment.
+
+The provider interface and extension workflow are described in [Payment adapters](docs/payments.md). Other sales channels can implement the same contract with their own verified incoming payment events.
+
+## External signing for Stars
+
+Approving a live Stars order prepares and stores its `PreparedTransaction`; the bot does not sign or broadcast it. Download the JSON from the admin order card or CLI:
+
+```sh
+uv run fragment-bot approve ORDER_ID --now
+uv run fragment-bot prepared ORDER_ID
+```
+
+`approve --now` outputs the JSON when it performs preparation itself. If the running worker claimed the order first, wait for `prepared` and export it using the second command. Demo/test exports have empty `messages` and `raw.simulated=true`.
+
+Sign and broadcast the live transaction externally before `valid_until`, using `sender_address`. Check every message, including the SDK fee. See the SDK's [external signing example](https://github.com/S1qwy/fragment-api-py/blob/04a0601b6cc7f11af0291683ddd773b2d96eb689/examples/external_signing.py). After independently confirming delivery, record it with `resolve-prepared ID delivered --evidence "..."`. If nothing was broadcast, wait for expiry, verify the blockchain and record `not_broadcast`; the order can then be refunded.
+
+## CLI and recovery
 
 ```sh
 uv run fragment-bot --help
-uv run fragment-bot doctor
-uv run fragment-bot set name "Мой магазин"
-uv run fragment-bot product stars 50 100
-uv run fragment-bot demo-buy stars 50 @example
+uv run fragment-bot doctor --online
+uv run fragment-bot settings
+uv run fragment-bot set pricing_mode rates
+uv run fragment-bot set stars_rate 2
+uv run fragment-bot set premium_price_6 1700
+uv run fragment-bot set enabled_ton 0
+uv run fragment-bot reset-setting welcome
+uv run fragment-bot catalog
 uv run fragment-bot orders --pending
-uv run fragment-bot approve ORDER_ID --now
 uv run fragment-bot order ORDER_ID
+uv run fragment-bot approve ORDER_ID
+uv run fragment-bot refund ORDER_ID
 ```
 
-Пример `demo-buy` работает без токена Telegram. Без `--now` команда `approve` ставит заказ в очередь запущенного бота. Для live сессии есть `doctor --online`. Для возврата используйте `refund ORDER_ID`. При неизвестном результате выдачи проверьте `reconcile ORDER_ID`. После независимой проверки операции в блокчейне можно записать `resolve ORDER_ID settled --evidence "…"` или `resolve ORDER_ID not_broadcast --evidence "…"`. `settled` отражает факт обработки транзакции в блокчейне. Для статуса выдачи требуется подтверждение Fragment. После `not_broadcast` доступен возврат. Операция с неизвестным исходом автоматически повторно не отправляется. Команда `retry ORDER_ID` возвращает в очередь только попытку без записанной операции Fragment. Для сверки платежей вне заказов есть `payment-errors` и `refund-payment-error CHARGE_ID`.
+`approve` without `--now` queues the order for the running worker. Unknown delivery outcomes require reconciliation, not a fresh purchase: use `reconcile ID`. `resolve ID settled --evidence "..."` records independently verified blockchain settlement; delivery still requires Fragment confirmation. `resolve ID not_broadcast --evidence "..."` enables refund after confirming nothing was sent. `retry ID` only requeues an attempt with no recorded Fragment operation. The SDK intent and order link are journaled atomically before broadcast.
 
-## Внешняя подпись Stars
+Use `payment-errors` and `refund-payment-error CHARGE_ID` for unmatched receipts. Refunds use the order's original payment adapter. Store the SQLite database and SDK journal privately.
 
-В live одобрение заказа Stars сохраняет полный `PreparedTransaction` и переводит заказ в статус «Транзакция подготовлена, ожидает внешней подписи». В Telegram откройте `/order ID` и нажмите «Скачать PreparedTransaction». В консоли `approve ID --now` выводит JSON в stdout, а `prepared ID` повторно выгружает сохранённый JSON. Если запущенный воркер успел забрать заказ первым, дождитесь статуса `prepared` и воспользуйтесь `prepared ID`.
+For offline demo testing, use `demo-settings` and `demo-buy stars 50 @example`. `demo-settings` fills default fields; `--overwrite` intentionally replaces customized demo text. Demo purchase commands cannot run in live mode.
 
-В demo и test тот же сценарий возвращает имитацию `PreparedTransaction` с пустым `messages` и `raw.simulated=true`.
+## Attribution
 
-Подпишите и отправьте транзакцию live во внешнем кошельке до `valid_until` с адреса `sender_address`. Перед подписью проверьте все `messages`, включая комиссию SDK. Пример экспорта в формат TON Connect и передачи подписанного BOC в Fragment есть в [SDK](https://github.com/S1qwy/fragment-api-py/blob/04a0601b6cc7f11af0291683ddd773b2d96eb689/examples/external_signing.py). JSON доступен оператору магазина.
+Architecture and interaction patterns are adapted from [Remnawave Bedolaga Telegram Bot](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot), including its [payment modules](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/tree/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/services/payment), [Stars payment handler](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/blob/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/handlers/stars_payments.py), [webhook routing](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/blob/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/webserver/payments.py), [menu](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/blob/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/handlers/menu.py), [rich menu utilities](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/blob/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/utils/rich_menu.py) and [menu layout settings](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/blob/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/services/menu_layout/constants.py). This repository implements the storefront specifically for [fragment-api-py](https://github.com/S1qwy/fragment-api-py); it does not claim to include every upstream payment provider.
 
-После подтверждения выдачи во Fragment запишите результат через `resolve-prepared ID delivered --evidence "…"` или `/resolveprepared ID delivered основание`. Если транзакцию не отправляли, дождитесь истечения срока, проверьте блокчейн и зафиксируйте `not_broadcast` тем же способом. После этого доступен возврат XTR.
+## Development
 
-## Интеграция платежей и источник логики
-
-Проект опирается на архитектуру [Remnawave Bedolaga Telegram Bot](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot). Разделение провайдера, общей обработки платежа и выдачи адаптировано из [платёжных модулей](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/tree/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/services/payment), [обработчика Stars](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/blob/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/handlers/stars_payments.py) и [маршрутизации вебхуков](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/blob/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/webserver/payments.py). Навигация внутри сообщения и отдельные разделы админки основаны на [меню Bedolaga](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/blob/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/handlers/menu.py). Реализация написана для этого магазина. Выдача работает через [fragment-api-py](https://github.com/S1qwy/fragment-api-py).
-
-[Как добавить платёжный адаптер](docs/payments.md).
-
-## Проверки
+Work is currently on `dev`.
 
 ```sh
 uv sync --locked --extra dev
@@ -86,3 +137,5 @@ uv run ruff check .
 uv run ruff format --check .
 uv run pytest
 ```
+
+CI runs the suite on Python 3.11/3.12 and builds the Docker image.

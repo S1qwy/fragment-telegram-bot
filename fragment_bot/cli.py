@@ -93,10 +93,10 @@ async def execute(args: argparse.Namespace) -> None:
                 store.bind_bot(info.id)
                 print(f"Telegram @{info.username}")
         print(f"Режим {config.mode} · база {store.path}")
-        print(f"Администраторов: {len(config.admin_ids)} · товаров: {len(store.products())}")
+        print(f"Администраторов: {len(config.admin_ids)} · товаров: {len(store.sale_products())}")
         print("Магазин открыт." if store.settings()["open"] == "1" else "Магазин закрыт.")
     elif command == "catalog":
-        for product in store.products():
+        for product in store.sale_products():
             print(f"{product.kind} {product.quantity} · {product.label} · {product.price} XTR")
     elif command == "settings":
         print(json.dumps(store.settings(), ensure_ascii=False, indent=2, sort_keys=True))
@@ -170,12 +170,7 @@ async def execute(args: argparse.Namespace) -> None:
         if not 0 < args.buyer <= 2**52 - 1:
             raise ShopError("Введите корректный ID покупателя.")
         quantity = number(args.quantity, "Количество")
-        product = next(
-            (p for p in store.products() if (p.kind, p.quantity) == (args.kind, quantity)),
-            None,
-        )
-        if product is None:
-            raise ShopError("Товар не найден. Посмотрите catalog.")
+        product = store.quote(args.kind, quantity)
         checkout = Checkout(store, DemoGateway())
         order = checkout.create(args.buyer, product, args.recipient, store.settings()["terms"])
         order = DemoGateway.pay(checkout, order.id, args.buyer)

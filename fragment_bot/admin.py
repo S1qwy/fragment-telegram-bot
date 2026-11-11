@@ -244,6 +244,22 @@ def admin_router(
         )
 
     async def inventory(message: Message, *, edit: bool = False) -> None:
+        if store.settings()["pricing_mode"] == "rates":
+            lines = [f"{package(p)} · {price(p.price)}" for p in store.sale_products()]
+            await screen(
+                message,
+                "<b>💰 Курсы и товары</b>\n\n" + "\n".join(lines),
+                keys(
+                    [
+                        button(
+                            "⚙️ Курсы, цены и доступность", "settings:group:pricing", style="primary"
+                        )
+                    ],
+                    back("admin"),
+                ),
+                edit=edit,
+            )
+            return
         rows = [
             [
                 button(
@@ -257,6 +273,7 @@ def admin_router(
             message,
             "<b>📦 Товары и цены</b>\n\n" + ("Выберите позицию." if rows else "Каталог пуст."),
             keys(
+                [button("💰 Курсы и доступность", "settings:group:pricing")],
                 [button("＋ Добавить товар", "admin:add", style="success")],
                 *rows,
                 back("admin", "Управление"),

@@ -9,7 +9,15 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, InlineKeyboardButton, Message, User
 
 from .admin import admin_router, show_order
-from .catalog import Product, username
+from .catalog import (
+    GRAM_TOPUP_MAX,
+    GRAM_TOPUP_MIN,
+    STARS_PURCHASE_MAX,
+    STARS_PURCHASE_MIN,
+    Product,
+    number,
+    username,
+)
 from .config import Config, ShopError
 from .fulfillment import Fulfillment
 from .payments import Checkout, DemoGateway
@@ -45,6 +53,7 @@ def check_recipient_policy(settings: dict[str, str], buyer: User, recipient: str
 
 
 class Draft(StatesGroup):
+    quantity = State()
     recipient = State()
     confirm = State()
 
@@ -131,7 +140,7 @@ def shop_router(
                 edit=edit,
             )
             return
-        products = store.products()
+        products = store.sale_products()
         if kind is None:
             rows = []
             for key in settings["category_order"].split(","):
@@ -145,11 +154,20 @@ def shop_router(
             await screen(message, f"{title}\n\n{description}", keys(*rows, back()), edit=edit)
             return
         icon, label, description = PRODUCTS[kind]
+        if settings[f"enabled_{kind}"] != "1":
+            raise ShopError("Этот товар отключён.")
         rows = [
             [button(f"{package(item)}   ·   {price(item.price)}", f"buy:{kind}:{item.quantity}")]
             for item in products
             if item.kind == kind
         ]
+        if settings["pricing_mode"] == "rates" and (
+            kind == "ton" or (kind == "stars" and settings["stars_custom"] == "1")
+        ):
+            if kind == "ton":
+                rows = []
+            rows.append([button("✏️ Указать количество", f"custom:{kind}", style="primary")])
+            description += f"\nКурс: {settings[f'{kind}_rate']} XTR за единицу."
         await screen(
             message,
             f"<b>{icon} {label}</b>\n\n{description}\n\n"
@@ -275,9 +293,11 @@ def shop_router(
         await state.clear()
         await show_order(query.message, order, edit=True, icons=current_icons())
 
-    async def ask_recipient(query: CallbackQuery, state: FSMContext, product: Product) -> None:
+    async def ask_recipient(
+        message: Message, buyer: User, state: FSMContext, product: Product, *, edit: bool = True
+    ) -> None:
         settings = store.settings()
-        if settings["allow_gifts"] == "0" and not query.from_user.username:
+        if settings["allow_gifts"] == "0" and not buyer.username:
             raise ShopError(
                 "Добавьте публичный @username в настройках Telegram, чтобы оформить заказ."
             )
@@ -286,16 +306,16 @@ def shop_router(
                 "kind": product.kind,
                 "quantity": product.quantity,
                 "price": product.price,
-                "prompt_id": query.message.message_id,
+                "prompt_id": message.message_id if edit else None,
             }
         )
         await state.set_state(Draft.recipient)
         icon, label, _ = PRODUCTS[product.kind]
         rows = []
-        if query.from_user.username and settings["allow_self"] == "1":
+        if buyer.username and settings["allow_self"] == "1":
             rows.append([button("👤 Отправить себе", "recipient:self", style="primary")])
         await screen(
-            query.message,
+            message,
             f"<b>{icon} {label}</b>\n{package(product)} · <b>{price(product.price)}</b>\n\n"
             + (
                 "Пришлите <code>@username</code> получателя."
@@ -303,7 +323,46 @@ def shop_router(
                 else "Пришлите свой <code>@username</code>."
             ),
             keys(*rows, back(f"category:{product.kind}", "К пакетам")),
+            edit=edit,
+        )
+
+    @router.callback_query(F.data.startswith("custom:"))
+    async def custom_amount(query: CallbackQuery, state: FSMContext) -> None:
+        await query.answer()
+        kind = query.data.split(":", 1)[1]
+        settings = store.settings()
+        if (
+            kind not in {"stars", "ton"}
+            or settings["pricing_mode"] != "rates"
+            or settings["open"] != "1"
+            or settings[f"enabled_{kind}"] != "1"
+            or (kind == "stars" and settings["stars_custom"] != "1")
+        ):
+            raise ShopError("Произвольное количество недоступно.")
+        await state.set_state(Draft.quantity)
+        await state.set_data({"kind": kind})
+        lower, upper = (
+            (STARS_PURCHASE_MIN, STARS_PURCHASE_MAX)
+            if kind == "stars"
+            else (GRAM_TOPUP_MIN, GRAM_TOPUP_MAX)
+        )
+        await screen(
+            query.message,
+            f"<b>Укажите количество</b>\n\nОт {lower} до {upper}, целое число.\nКурс: {settings[f'{kind}_rate']} XTR за единицу.\nИтоговая цена счёта — до 10 000 XTR.",
+            keys(back(f"category:{kind}")),
             edit=True,
+        )
+
+    @router.message(Draft.quantity, F.text, ~F.text.startswith("/"))
+    async def enter_quantity(message: Message, state: FSMContext) -> None:
+        kind = (await state.get_data())["kind"]
+        product = store.quote(kind, number(message.text.strip(), "Количество"))
+        await ask_recipient(
+            message,
+            message.from_user,
+            state,
+            product,
+            edit=False,
         )
 
     @router.callback_query(F.data.startswith("buy:"))
@@ -313,20 +372,25 @@ def shop_router(
         selected = next(
             (
                 item
-                for item in store.products()
+                for item in store.sale_products()
                 if item.kind == kind and str(item.quantity) == quantity
             ),
             None,
         )
         if selected is None or store.settings()["open"] != "1":
             raise ShopError("Позиция сейчас недоступна. Откройте /catalog.")
-        await ask_recipient(query, state, selected)
+        await ask_recipient(query.message, query.from_user, state, selected)
 
     @router.callback_query(Draft.confirm, F.data == "recipient:edit")
     async def edit_recipient(query: CallbackQuery, state: FSMContext) -> None:
         await query.answer()
         data = await state.get_data()
-        await ask_recipient(query, state, Product(data["kind"], data["quantity"], data["price"]))
+        await ask_recipient(
+            query.message,
+            query.from_user,
+            state,
+            Product(data["kind"], data["quantity"], data["price"]),
+        )
 
     async def preview(
         message: Message, state: FSMContext, value: str, buyer: User, *, edit: bool = False

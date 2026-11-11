@@ -109,7 +109,7 @@ class Fulfillment:
         return client
 
     async def check_live(self, *, online: bool = False) -> None:
-        kinds = {product.kind for product in self.store.products()}
+        kinds = {product.kind for product in self.store.sale_products()}
         if "stars" in kinds:
             async with self.client("prepare"):
                 pass

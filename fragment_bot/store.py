@@ -6,7 +6,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from uuid import uuid4
 
-from .catalog import DEMO_PRODUCTS, DEMO_SETTINGS, SETTINGS, Product, setting_value
+from .catalog import (
+    DEMO_PRODUCTS,
+    DEMO_SETTINGS,
+    SETTINGS,
+    Product,
+    quote,
+    sale_products,
+    setting_value,
+)
 from .config import Mode, ShopError
 
 SCHEMA = """
@@ -150,6 +158,8 @@ class Store:
             )
             if row is None:
                 db.execute("INSERT INTO metadata VALUES ('mode', ?)", (mode,))
+                if mode == "live":
+                    db.execute("UPDATE settings SET value='rates' WHERE key='pricing_mode'")
                 if mode != "live":
                     db.executemany(
                         "INSERT INTO products VALUES (?, ?, ?)",
@@ -186,7 +196,8 @@ class Store:
                 configured = dict(db.execute("SELECT key, value FROM settings"))
                 if self.mode == "live" and not (configured["terms"] and configured["support"]):
                     raise ShopError("Перед открытием укажите terms и support.")
-                if not db.execute("SELECT 1 FROM products LIMIT 1").fetchone():
+                listed = [Product(*row) for row in db.execute("SELECT * FROM products")]
+                if not sale_products(configured, listed):
                     raise ShopError("Перед открытием добавьте товар.")
             if self.mode == "live" and key in {"terms", "support"} and not value:
                 opened = db.execute("SELECT value FROM settings WHERE key='open'").fetchone()
@@ -222,6 +233,12 @@ class Store:
                 Product(*row)
                 for row in db.execute("SELECT * FROM products ORDER BY kind DESC, quantity")
             ]
+
+    def sale_products(self) -> list[Product]:
+        return sale_products(self.settings(), self.products())
+
+    def quote(self, kind: str, quantity: int) -> Product:
+        return quote(self.settings(), kind, quantity, self.products())
 
     def list_product(self, product: Product, *, existing_only: bool = False) -> None:
         with self.connection() as db:
@@ -261,13 +278,11 @@ class Store:
         with self.connection() as db:
             db.execute("BEGIN IMMEDIATE")
             settings = dict(db.execute("SELECT key, value FROM settings"))
-            price = db.execute(
-                "SELECT price FROM products WHERE kind=? AND quantity=?",
-                (product.kind, product.quantity),
-            ).fetchone()
+            listed = [Product(*row) for row in db.execute("SELECT * FROM products")]
+            current = quote(settings, product.kind, product.quantity, listed)
             if settings["open"] != "1":
                 raise ShopError("Магазин сейчас закрыт.")
-            if price is None or price["price"] != product.price or terms != settings["terms"]:
+            if current != product or terms != settings["terms"]:
                 raise ShopError("Каталог или условия изменились. Откройте товар заново.")
             row = db.execute(
                 "INSERT INTO orders (id,buyer,kind,quantity,price,recipient,terms,provider,currency) "
@@ -356,7 +371,8 @@ class Store:
                     "AND state='unpaid' AND (checkout_id IS NULL OR checkout_id=?) "
                     "AND created_at >= datetime('now', printf('-%d minutes', "
                     "(SELECT value FROM settings WHERE key='checkout_minutes'))) "
-                    "AND (SELECT value FROM settings WHERE key='open')='1'",
+                    "AND (SELECT value FROM settings WHERE key='open')='1' "
+                    "AND (SELECT value FROM settings WHERE key='enabled_' || orders.kind)='1'",
                     (query_id, order_id, buyer, price, provider, currency, query_id),
                 ).rowcount
             )

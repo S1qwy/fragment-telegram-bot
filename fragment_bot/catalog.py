@@ -1,5 +1,6 @@
 import re
 from dataclasses import dataclass
+from decimal import ROUND_CEILING, Decimal
 from urllib.parse import parse_qs, urlsplit
 
 from FragmentAPI.types.constants import (
@@ -124,6 +125,58 @@ SETTING_HELP = {
     "support_url": "Укажите HTTPS-ссылку или Telegram-ссылку на чат, пользователя или приглашение.",
 }
 
+SETTINGS.update(
+    {
+        "pricing_mode": ("catalog", 8),
+        "stars_rate": ("2", 16),
+        "ton_rate": ("350", 16),
+        "stars_packages": ("50,100,250,500,1000", 100),
+        "stars_custom": ("1", 1),
+        **{f"enabled_{kind}": ("1", 1) for kind in PRODUCTS},
+        "premium_price_3": ("950", 5),
+        "premium_price_6": ("1700", 5),
+        "premium_price_12": ("3000", 5),
+    }
+)
+SETTING_GROUPS["pricing"] = (
+    "💰 Курсы и товары",
+    (
+        "pricing_mode",
+        "enabled_stars",
+        "stars_rate",
+        "stars_packages",
+        "stars_custom",
+        "enabled_premium",
+        "premium_price_3",
+        "premium_price_6",
+        "premium_price_12",
+        "enabled_ton",
+        "ton_rate",
+    ),
+)
+SETTING_LABELS.update(
+    {
+        "pricing_mode": "Расчёт цен",
+        "stars_rate": "XTR за одну Star",
+        "ton_rate": "XTR за один GRAM",
+        "stars_packages": "Пять пакетов Stars",
+        "stars_custom": "Произвольное количество Stars",
+        **{f"enabled_{kind}": f"Продажа {label}" for kind, label in PRODUCTS.items()},
+        **{f"premium_price_{months}": f"Premium {months} мес. · XTR" for months in (3, 6, 12)},
+    }
+)
+SETTING_OPTIONS["pricing_mode"] = {"catalog": "Цены отдельных пакетов", "rates": "Курсы и сроки"}
+for _key in ("stars_custom", "enabled_stars", "enabled_premium", "enabled_ton"):
+    SETTING_OPTIONS[_key] = {"1": "Включено", "0": "Выключено"}
+SETTING_HELP.update(
+    {
+        "pricing_mode": "Режим курсов: Stars и GRAM по количеству, Premium по сроку. Старый каталог сохраняется отдельно.",
+        "stars_rate": "Цена одной Star в XTR. До 6 знаков после точки; итог округляется вверх.",
+        "ton_rate": "Цена одного GRAM в XTR. До 6 знаков после точки; итог округляется вверх.",
+        "stars_packages": "Ровно пять разных количеств Stars через запятую, в пределах SDK.",
+    }
+)
+
 DEMO_SETTINGS = {
     "name": "Fragment Shop · Демо",
     "tagline": "Stars, Premium и GRAM",
@@ -172,6 +225,24 @@ def setting_value(key: str, value: str) -> str:
         raise ShopError(f"Проверьте значение настройки «{SETTING_LABELS[key]}» (до {limit} симв.).")
     if key in SETTING_OPTIONS and value not in SETTING_OPTIONS[key]:
         raise ShopError(f"Допустимые значения: {', '.join(SETTING_OPTIONS[key])}.")
+    if key in {"stars_rate", "ton_rate"}:
+        if (
+            not re.fullmatch(r"[0-9]{1,5}(?:\.[0-9]{1,6})?", value)
+            or not 0 < Decimal(value) <= 10000
+        ):
+            raise ShopError("Курс: положительное число до 10000, до 6 знаков после точки.")
+        return format(Decimal(value).normalize(), "f")
+    if key.startswith("premium_price_"):
+        if not value.isascii() or not value.isdigit() or not 1 <= int(value) <= 10000:
+            raise ShopError("Цена Premium: от 1 до 10000 XTR.")
+        return str(int(value))
+    if key == "stars_packages":
+        values = [number(part.strip(), "Stars") for part in value.split(",")]
+        if len(set(values)) != 5 or len(values) != 5:
+            raise ShopError("Укажите ровно пять разных пакетов Stars.")
+        for quantity in values:
+            Product("stars", quantity, 1)
+        return ",".join(map(str, sorted(values)))
     if key == "checkout_minutes":
         if not re.fullmatch(r"[0-9]{1,3}", value) or not 5 <= int(value) <= 120:
             raise ShopError("Укажите целое число от 5 до 120 минут.")
@@ -240,3 +311,46 @@ class Product:
 
 
 DEMO_PRODUCTS = (Product("stars", 50, 100), Product("premium", 3, 950), Product("ton", 1, 350))
+
+
+def quote(settings: dict[str, str], kind: str, quantity: int, listed: list[Product]) -> Product:
+    if kind not in PRODUCTS or settings[f"enabled_{kind}"] != "1":
+        raise ShopError("Этот товар отключён.")
+    if settings["pricing_mode"] == "catalog":
+        product = next((p for p in listed if (p.kind, p.quantity) == (kind, quantity)), None)
+        if product is None:
+            raise ShopError("Позиция сейчас недоступна. Откройте /catalog.")
+        return product
+    if kind == "premium":
+        Product(kind, quantity, 1)
+        amount = int(settings[f"premium_price_{quantity}"])
+    else:
+        if (
+            kind == "stars"
+            and settings["stars_custom"] != "1"
+            and str(quantity) not in settings["stars_packages"].split(",")
+        ):
+            raise ShopError("Выберите доступный пакет Stars.")
+        amount = int(
+            (Decimal(settings[f"{kind}_rate"]) * quantity).to_integral_value(rounding=ROUND_CEILING)
+        )
+    return Product(kind, quantity, amount)
+
+
+def sale_products(settings: dict[str, str], listed: list[Product]) -> list[Product]:
+    if settings["pricing_mode"] == "catalog":
+        return [p for p in listed if settings[f"enabled_{p.kind}"] == "1"]
+    result = []
+    for kind, quantities in (
+        ("stars", map(int, settings["stars_packages"].split(","))),
+        ("premium", (3, 6, 12)),
+        ("ton", (GRAM_TOPUP_MIN,)),
+    ):
+        if settings[f"enabled_{kind}"] != "1":
+            continue
+        for quantity in quantities:
+            try:
+                result.append(quote(settings, kind, quantity, listed))
+            except ShopError:
+                pass  # A package may exceed the Telegram invoice limit at the configured rate.
+    return result

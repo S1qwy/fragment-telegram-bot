@@ -14,6 +14,7 @@ from fragment_bot.store import Store
 
 async def test_live_requires_fragment_confirmation_and_recovers_original_order(tmp_path):
     store = Store(tmp_path, "live")
+    store.configure("pricing_mode", "catalog")
     store.configure("terms", "Условия")
     store.configure("support", "@shop_support")
     product = Product("premium", 3, 100)
