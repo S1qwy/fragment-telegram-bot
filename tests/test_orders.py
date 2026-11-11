@@ -136,7 +136,7 @@ async def test_refund_fences_broadcast_when_intent_is_missing(tmp_path):
 @pytest.mark.parametrize(
     ("kind", "quantity", "price"), [("stars", 50, 100), ("premium", 3, 950), ("ton", 1, 350)]
 )
-async def test_demo_delivery_for_every_product(tmp_path, kind, quantity, price):
+async def test_demo_fulfillment_for_every_product(tmp_path, kind, quantity, price):
     store = Store(tmp_path, "demo")
     checkout = Checkout(store, DemoGateway())
     fulfillment = Fulfillment(Config("demo", tmp_path), store)
@@ -144,5 +144,12 @@ async def test_demo_delivery_for_every_product(tmp_path, kind, quantity, price):
     assert DemoGateway.pay(checkout, order.id, order.buyer).state == "paid"
     assert store.approve(order.id).state == "queued"
     result = await asyncio.wait_for(fulfillment.deliver(store.claim(order.id)), timeout=1)
-    assert result.state == "delivered"
-    assert result.transaction_id == f"test-{order.id}"
+    if kind == "stars":
+        assert result.state == "prepared"
+        prepared = fulfillment.prepared(order.id)
+        assert prepared.raw == {"simulated": True}
+        assert prepared.messages == []
+        assert prepared.sender_address is None
+    else:
+        assert result.state == "delivered"
+        assert result.transaction_id == f"test-{order.id}"

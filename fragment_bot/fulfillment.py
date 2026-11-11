@@ -1,9 +1,10 @@
 import asyncio
 import logging
 from contextvars import ContextVar
+from time import time
 from typing import Literal
 
-from FragmentAPI import FragmentClient, FragmentError, PurchaseResult
+from FragmentAPI import FragmentClient, FragmentError, PreparedTransaction, PurchaseResult
 from FragmentAPI.storage.payments import PaymentStorage
 from FragmentAPI.types.models import PaymentRecord
 from FragmentAPI.utils.locking import file_wallet_lock
@@ -15,6 +16,12 @@ from .store import Order, Store
 
 log = logging.getLogger(__name__)
 active_order: ContextVar[str | None] = ContextVar("active_order", default=None)
+
+
+def check_ton_limit(transaction: PreparedTransaction, max_nanoton: int) -> None:
+    required = sum(int(message.amount) for message in transaction.messages)
+    if required + transaction.gas_reserve_nanoton > max_nanoton:
+        raise ShopError("Сумма Fragment с комиссией и резервом превышает FRAGMENT_MAX_TON.")
 
 
 class OrderPaymentJournal(PaymentStorage):
@@ -34,12 +41,7 @@ class OrderPaymentJournal(PaymentStorage):
                 "SELECT 1 FROM fragment_payments WHERE operation_id=?", (record.operation_id,)
             ).fetchone()
             if previous is None:
-                prepared = record.prepared
-                required = sum(int(message.amount) for message in prepared.messages)
-                if required + prepared.gas_reserve_nanoton > self.max_nanoton:
-                    raise ShopError(
-                        "Сумма Fragment с комиссией и резервом превышает FRAGMENT_MAX_TON."
-                    )
+                check_ton_limit(record.prepared, self.max_nanoton)
                 linked = db.execute(
                     "UPDATE orders SET operation_id=? "
                     "WHERE id=? AND state='sending' AND operation_id IS NULL",
@@ -79,16 +81,21 @@ class Fulfillment:
     def operation_lock(self):
         return file_wallet_lock(f"fragment-bot:{self.store.path.resolve()}")
 
-    def client(self, *, payer: bool = False) -> FragmentClient:
+    def client(self, mode: Literal["read", "prepare", "pay"] = "read") -> FragmentClient:
         if not self.config.cookies:
             raise ShopError("Укажите FRAGMENT_COOKIES.")
-        if payer:
+        if mode == "pay":
             self.config.require_wallet()
+        account = self.config.sender_account if mode == "prepare" else None
+        seed = self.config.seed if mode != "read" and account is None else None
+        if mode == "prepare" and not (seed or account):
+            raise ShopError("Для Stars укажите TON_SENDER_ACCOUNT или TON_SEED.")
         try:
             client = FragmentClient(
                 cookies=self.config.cookies,
-                seed=self.config.seed if payer else None,
-                api_key=self.config.api_key if payer else None,
+                seed=seed,
+                sender_account=account,
+                api_key=self.config.api_key if mode == "pay" else None,
                 api_provider=self.config.api_provider,
                 wallet_version=self.config.wallet_version,
                 mnemonic_type=self.config.mnemonic_type,
@@ -96,9 +103,41 @@ class Fulfillment:
             )
         except FragmentError:
             raise ShopError("Проверьте настройки сессии Fragment и TON-кошелька.") from None
-        if payer and not client.has_ton_token:
+        if mode == "pay" and not client.has_ton_token:
             raise ShopError("Сессия Fragment должна содержать stel_ton_token.")
         return client
+
+    async def check_live(self, *, online: bool = False) -> None:
+        kinds = {product.kind for product in self.store.products()}
+        if "stars" in kinds:
+            async with self.client("prepare"):
+                pass
+        if kinds & {"premium", "ton"}:
+            async with self.client("pay"):
+                pass
+        async with self.client() as client:
+            if online:
+                await client.get_profile()
+
+    def prepared(self, order_id: str) -> PreparedTransaction:
+        return PreparedTransaction.model_validate_json(self.store.get_prepared(order_id))
+
+    async def resolve_prepared(
+        self, order_id: str, outcome: Literal["delivered", "not_broadcast"], evidence: str
+    ) -> Order:
+        evidence = evidence.strip()
+        if outcome not in {"delivered", "not_broadcast"} or not 1 <= len(evidence) <= 500:
+            raise ShopError("Укажите delivered или not_broadcast и основание до 500 символов.")
+        async with self.operation_lock():
+            transaction = self.prepared(order_id)
+            if outcome == "not_broadcast" and transaction.valid_until > time():
+                raise ShopError("Дождитесь истечения срока транзакции и проверьте блокчейн.")
+            return self.store.transition(
+                order_id,
+                ("prepared",),
+                "delivered" if outcome == "delivered" else "prepared_void",
+                note=f"Ручная сверка ({outcome}): {evidence}",
+            )
 
     async def verify_recipient(self, product: Product, recipient: str) -> str | None:
         if self.config.mode != "live":
@@ -125,20 +164,44 @@ class Fulfillment:
             if order.state != "sending":
                 return order
             if self.config.mode != "live":
+                if order.kind == "stars":
+                    prepared = PreparedTransaction(
+                        req_id=f"test-{order.id}",
+                        item_kind=order.kind,
+                        target=order.recipient,
+                        amount=order.quantity,
+                        valid_until=int(time()) + 300,
+                        raw={"simulated": True},
+                    )
+                    return self.store.save_prepared(
+                        order.id, prepared.req_id, prepared.model_dump_json()
+                    )
                 return self.store.transition(
                     order.id,
                     ("sending",),
                     "delivered",
                     transaction_id=f"test-{order.id}",
                 )
+            if order.operation_id:
+                return self.store.transition(
+                    order.id, ("sending",), "review", note="Сверьте исходную операцию Fragment."
+                )
             token = active_order.set(order.id)
             try:
-                async with self.client(payer=True) as client:
+                mode = "prepare" if order.kind == "stars" else "pay"
+                async with self.client(mode) as client:
                     result = await client.purchase(
                         order.kind,
                         order.recipient,
                         amount=order.quantity,
                         show_sender=False,
+                    )
+                if mode == "prepare":
+                    if not isinstance(result, PreparedTransaction) or not result.req_id:
+                        raise ShopError("Fragment не вернул подготовленную транзакцию Stars.")
+                    check_ton_limit(result, self.config.max_nanoton)
+                    return self.store.save_prepared(
+                        order.id, result.req_id, result.model_dump_json()
                     )
                 if isinstance(result, PurchaseResult) and result.confirmed:
                     return self.store.transition(
@@ -233,7 +296,7 @@ class Fulfillment:
                 raise ShopError("У заказа нет платежа.")
             await gateway.refund(order.buyer, order.charge_id)
             try:
-                return self.store.transition(order.id, ("refunding",), "refunded")
+                return self.store.transition(order.id, ("refunding",), "refunded", note=order.note)
             except ShopError:
                 return self.store.get(order.id)
 

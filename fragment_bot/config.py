@@ -1,3 +1,4 @@
+import json
 import os
 import re
 from dataclasses import dataclass, field
@@ -23,6 +24,7 @@ class Config:
     cookies: str = field(default="", repr=False)
     seed: str = field(default="", repr=False)
     api_key: str = field(default="", repr=False)
+    sender_account: dict[str, str] | None = None
     api_provider: str = "tonapi"
     wallet_version: str = "V5R1"
     mnemonic_type: str | None = None
@@ -36,7 +38,9 @@ class Config:
 
     def require_wallet(self) -> None:
         if not all((self.cookies, self.seed, self.api_key)):
-            raise ShopError("Для live заполните FRAGMENT_COOKIES, TON_SEED и TON_API_KEY.")
+            raise ShopError(
+                "Для выдачи Premium и GRAM заполните FRAGMENT_COOKIES, TON_SEED и TON_API_KEY."
+            )
 
     @classmethod
     def load(cls) -> "Config":
@@ -56,6 +60,17 @@ class Config:
                 raise InvalidOperation
         except InvalidOperation:
             raise ShopError("FRAGMENT_MAX_TON должен быть положительной суммой TON.") from None
+        raw_account = os.getenv("TON_SENDER_ACCOUNT", "").strip()
+        account = None
+        if raw_account:
+            try:
+                account = json.loads(raw_account)
+            except ValueError:
+                raise ShopError(
+                    "TON_SENDER_ACCOUNT должен быть JSON-объектом TON Connect."
+                ) from None
+            if not isinstance(account, dict):
+                raise ShopError("TON_SENDER_ACCOUNT должен быть JSON-объектом TON Connect.")
         return cls(
             mode=cast(Mode, mode),
             data_dir=Path(os.getenv("DATA_DIR", "data")).expanduser().resolve(),
@@ -64,6 +79,7 @@ class Config:
             cookies=os.getenv("FRAGMENT_COOKIES", "").strip(),
             seed=os.getenv("TON_SEED", "").strip(),
             api_key=os.getenv("TON_API_KEY", "").strip(),
+            sender_account=account,
             api_provider=os.getenv("TON_API_PROVIDER", "tonapi").strip(),
             wallet_version=os.getenv("TON_WALLET_VERSION", "V5R1").strip(),
             mnemonic_type=os.getenv("TON_MNEMONIC_TYPE", "").strip() or None,

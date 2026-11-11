@@ -2,6 +2,7 @@ import asyncio
 import logging
 import sqlite3
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
 from secrets import token_hex
 
 from aiogram import Bot, Dispatcher, F, Router
@@ -18,6 +19,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (
     BotCommand,
     BotCommandScopeChat,
+    BufferedInputFile,
     CallbackQuery,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -69,7 +71,9 @@ def order_markup(order: Order, *, admin: bool) -> InlineKeyboardMarkup | None:
         actions = []
         if order.state == "paid":
             actions.append((ACTIONS["approve"], f"ask:approve:{order.id}"))
-        if order.state in {"paid", "queued", "review", "sending", "refunding"}:
+        if order.state == "prepared":
+            actions.append(("Скачать PreparedTransaction", f"prepared:{order.id}"))
+        if order.state in {"paid", "queued", "review", "sending", "prepared_void", "refunding"}:
             actions.append((ACTIONS["refund"], f"ask:refund:{order.id}"))
         return keyboard(*[[action] for action in actions]) if actions else None
     if order.state == "unpaid" and not order.checkout_id:
@@ -243,7 +247,8 @@ def shop_router(
             "/product stars 50 100 — тип, количество, цена XTR\n"
             "/unlist stars 50 — скрыть позицию\n/pending — заказы в работе\n"
             "/paymenterrors — платежи на ручной проверке\n"
-            "/order ID — детали, выдача и возврат\n/reconcile ID — сверить выдачу"
+            "/order ID — детали, транзакция Stars и возврат\n/reconcile ID — сверить автовыдачу\n"
+            "/resolveprepared ID delivered|not_broadcast основание — результат внешней подписи"
         )
 
     @router.message(Command("set"))
@@ -339,6 +344,40 @@ def shop_router(
             )
         else:
             raise ShopError("Неизвестное действие.")
+
+    @router.callback_query(F.data.startswith("prepared:"))
+    async def download_prepared(query: CallbackQuery) -> None:
+        await query.answer()
+        admin_only(config, query.from_user.id)
+        order_id = query.data.split(":", 1)[1]
+        transaction = fulfillment.prepared(order_id)
+        document = BufferedInputFile(
+            transaction.model_dump_json(indent=2).encode("utf-8"),
+            filename=f"stars-{order_id}.json",
+        )
+        expires = datetime.fromtimestamp(transaction.valid_until, UTC)
+        caption = (
+            f"Заказ #{order_id} · срок подписи до {expires:%Y-%m-%d %H:%M:%S} UTC"
+            if config.mode == "live"
+            else f"Заказ #{order_id} · имитация PreparedTransaction"
+        )
+        await query.message.answer_document(
+            document,
+            caption=caption,
+        )
+
+    @router.message(Command("resolveprepared"))
+    async def resolve_prepared(message: Message, command: CommandObject) -> None:
+        admin_only(config, message.from_user.id)
+        parts = (command.args or "").split(maxsplit=2)
+        if len(parts) != 3:
+            raise ShopError("Формат: /resolveprepared ID delivered|not_broadcast основание")
+        order_id, outcome, evidence = parts
+        if outcome not in {"delivered", "not_broadcast"}:
+            raise ShopError("Результат должен быть delivered или not_broadcast.")
+        order = await fulfillment.resolve_prepared(order_id, outcome, evidence)
+        await message.answer(order.summary(admin=True))
+        await notify(message.bot, order)
 
     @router.message(Command("reconcile"))
     async def reconcile(message: Message, command: CommandObject, schedule: Callable) -> None:
@@ -467,8 +506,7 @@ async def run_bot(config: Config, store: Store) -> None:
         raise ShopError("Укажите хотя бы один ADMIN_IDS.")
     fulfillment = Fulfillment(config, store)
     if config.mode == "live":
-        async with fulfillment.client(payer=True):
-            pass
+        await fulfillment.check_live()
     bot = make_bot(config)
     async with bot:
         me = await bot.get_me()

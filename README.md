@@ -28,9 +28,9 @@ uv run fragment-bot run
 | --- | --- | --- |
 | `demo` | Кнопка имитации или CLI | Имитация |
 | `test` | XTR в [тестовой среде Telegram](https://core.telegram.org/bots/features#dedicated-test-environment), отдельный тестовый токен | Имитация |
-| `live` | Реальные XTR | Fragment после подтверждения оператором |
+| `live` | Реальные XTR | Stars подготавливаются для внешней подписи. Premium и GRAM выдаются автоматически после подтверждения оператором. |
 
-Для каждого режима и каждого токена используйте свой каталог данных. В `demo` и `test` каталог заполнен примерами. В `live` витрина закрыта до настройки каталога, условий и контакта поддержки. Данные SDK берутся из `.env` или переменных среды. Сессию можно подготовить по [документации SDK](https://github.com/S1qwy/fragment-api-py/wiki/Client-and-Authentication). Нужны пользовательские `FRAGMENT_COOKIES` с `stel_ton_token`, `TON_SEED` отдельного кошелька и `TON_API_KEY`. Перепроверьте кошелёк, комиссию SDK и лимит `FRAGMENT_MAX_TON`. Лимит применяется к фактической подготовленной операции с комиссией и резервом перед отправкой. SDK устанавливается из закреплённого Git-коммита v14.4.1.
+Для каждого режима и каждого токена используйте свой каталог данных. В `demo` и `test` каталог заполнен примерами. В `live` витрина закрыта до настройки каталога, условий и контакта поддержки. Данные SDK берутся из `.env` или переменных среды. Сессию можно подготовить по [документации SDK](https://github.com/S1qwy/fragment-api-py/wiki/Client-and-Authentication). Для Stars нужны `FRAGMENT_COOKIES` и публичный JSON аккаунта TON Connect в `TON_SENDER_ACCOUNT` (поля `address`, `chain`, `publicKey`, `walletStateInit`). Вместо публичного аккаунта можно указать `TON_SEED` для локального получения адреса. Для автоматической выдачи Premium и GRAM нужны `FRAGMENT_COOKIES` с `stel_ton_token`, `TON_SEED` отдельного кошелька и `TON_API_KEY`. Перепроверьте кошелёк, комиссию SDK и лимит `FRAGMENT_MAX_TON`. Лимит применяется к фактической подготовленной операции с комиссией и резервом перед отправкой. SDK устанавливается из закреплённого Git-коммита v14.4.1.
 
 ## Управление в Telegram
 
@@ -53,6 +53,16 @@ uv run fragment-bot order ORDER_ID
 ```
 
 Пример `demo-buy` работает без токена Telegram. Без `--now` команда `approve` ставит заказ в очередь запущенного бота. Для live сессии есть `doctor --online`. Для возврата используйте `refund ORDER_ID`. При неизвестном результате выдачи проверьте `reconcile ORDER_ID`. После независимой проверки операции в блокчейне можно записать `resolve ORDER_ID settled --evidence "…"` или `resolve ORDER_ID not_broadcast --evidence "…"`. `settled` отражает факт обработки транзакции в блокчейне. Для статуса выдачи требуется подтверждение Fragment. После `not_broadcast` доступен возврат. Операция с неизвестным исходом автоматически повторно не отправляется. Команда `retry ORDER_ID` возвращает в очередь только попытку без записанной операции Fragment. Для сверки платежей вне заказов есть `payment-errors` и `refund-payment-error CHARGE_ID`.
+
+## Внешняя подпись Stars
+
+В live одобрение заказа Stars сохраняет полный `PreparedTransaction` и переводит заказ в статус «Транзакция подготовлена, ожидает внешней подписи». В Telegram откройте `/order ID` и нажмите «Скачать PreparedTransaction». В консоли `approve ID --now` выводит JSON в stdout, а `prepared ID` повторно выгружает сохранённый JSON. Если запущенный воркер успел забрать заказ первым, дождитесь статуса `prepared` и воспользуйтесь `prepared ID`.
+
+В demo и test тот же сценарий возвращает имитацию `PreparedTransaction` с пустым `messages` и `raw.simulated=true`.
+
+Подпишите и отправьте транзакцию live во внешнем кошельке до `valid_until` с адреса `sender_address`. Перед подписью проверьте все `messages`, включая комиссию SDK. Пример экспорта в формат TON Connect и передачи подписанного BOC в Fragment есть в [SDK](https://github.com/S1qwy/fragment-api-py/blob/04a0601b6cc7f11af0291683ddd773b2d96eb689/examples/external_signing.py). JSON доступен оператору магазина.
+
+После подтверждения выдачи во Fragment запишите результат через `resolve-prepared ID delivered --evidence "…"` или `/resolveprepared ID delivered основание`. Если транзакцию не отправляли, дождитесь истечения срока, проверьте блокчейн и зафиксируйте `not_broadcast` тем же способом. После этого доступен возврат XTR.
 
 ## Интеграция платежей и источник логики
 

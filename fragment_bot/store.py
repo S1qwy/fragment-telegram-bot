@@ -50,6 +50,11 @@ CREATE TABLE IF NOT EXISTS fragment_payments (
     sender TEXT NOT NULL,
     document TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS prepared_transactions (
+    order_id TEXT PRIMARY KEY REFERENCES orders(id),
+    request_id TEXT NOT NULL UNIQUE,
+    document TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS payment_exceptions (
     provider TEXT NOT NULL,
     charge_id TEXT NOT NULL,
@@ -69,6 +74,8 @@ STATUS = {
     "queued": "В очереди на выдачу",
     "sending": "Выдаётся",
     "review": "На проверке",
+    "prepared": "Транзакция подготовлена, ожидает внешней подписи",
+    "prepared_void": "Ожидает возврата оплаты",
     "delivered": "Выдан",
     "refunding": "Возврат обрабатывается",
     "refunded": "Оплата возвращена",
@@ -257,7 +264,7 @@ class Store:
                 )
             elif pending:
                 rows = db.execute(
-                    "SELECT * FROM orders WHERE state IN ('paid','queued','sending','review','refunding') "
+                    "SELECT * FROM orders WHERE state IN ('paid','queued','sending','review','prepared','prepared_void','refunding') "
                     "ORDER BY rowid ASC LIMIT 10"
                 )
             else:
@@ -343,11 +350,36 @@ class Store:
                 raise ShopError("Заказ сменил статус или действие для него недоступно.")
             return Order(**row)
 
+    def save_prepared(self, order_id: str, request_id: str, document: str) -> Order:
+        with self.connection() as db:
+            row = db.execute(
+                "UPDATE orders SET state='prepared' WHERE id=? AND kind='stars' "
+                "AND state='sending' AND operation_id IS NULL RETURNING *",
+                (order_id,),
+            ).fetchone()
+            if row is None:
+                raise ShopError("Заказ больше не ожидает подготовки транзакции.")
+            db.execute(
+                "INSERT INTO prepared_transactions VALUES (?,?,?)", (order_id, request_id, document)
+            )
+            return Order(**row)
+
+    def get_prepared(self, order_id: str) -> str:
+        with self.connection() as db:
+            row = db.execute(
+                "SELECT p.document FROM prepared_transactions p JOIN orders o ON o.id=p.order_id "
+                "WHERE o.id=? AND o.state='prepared'",
+                (order_id.lower(),),
+            ).fetchone()
+        if row is None:
+            raise ShopError("У заказа нет транзакции, ожидающей внешней подписи.")
+        return row["document"]
+
     def start_refund(self, order_id: str, *, verified_not_sent: bool = False) -> Order:
         with self.connection() as db:
             row = db.execute(
                 "UPDATE orders SET state='refunding' WHERE id=? AND charge_id IS NOT NULL AND "
-                "(state IN ('paid','queued','refunding') OR "
+                "(state IN ('paid','queued','prepared_void','refunding') OR "
                 "(state IN ('review','sending') AND (operation_id IS NULL OR ?))) RETURNING *",
                 (order_id.lower(), verified_not_sent),
             ).fetchone()

@@ -1,8 +1,9 @@
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock
 
+import pytest
 from aiogram import Bot, Dispatcher
-from aiogram.methods import AnswerCallbackQuery, SendMessage
+from aiogram.methods import AnswerCallbackQuery, SendDocument, SendMessage
 from aiogram.types import (
     CallbackQuery,
     Chat,
@@ -12,6 +13,7 @@ from aiogram.types import (
     Update,
     User,
 )
+from FragmentAPI import PreparedTransaction
 
 from fragment_bot.bot import handle_payment, shop_router
 from fragment_bot.catalog import Product
@@ -43,7 +45,8 @@ async def test_demo_bot_checkout_and_admin_actions(tmp_path):
         bot.session.make_request = AsyncMock(return_value=True)
         checkout = Checkout(store, DemoGateway(bot))
         dispatcher = Dispatcher()
-        dispatcher.include_router(shop_router(config, store, checkout, Fulfillment(config, store)))
+        fulfillment = Fulfillment(config, store)
+        dispatcher.include_router(shop_router(config, store, checkout, fulfillment))
 
         async def callback(data, *, user=BUYER):
             await dispatcher.feed_update(
@@ -81,6 +84,16 @@ async def test_demo_bot_checkout_and_admin_actions(tmp_path):
         assert store.get(order.id).state == "paid"
         await callback(f"act:approve:{order.id}", user=ADMIN)
         assert store.get(order.id).state == "queued"
+        await fulfillment.deliver(store.claim(order.id))
+        with pytest.raises(ShopError, match="администратору"):
+            await callback(f"prepared:{order.id}")
+        await callback(f"prepared:{order.id}", user=ADMIN)
+        download = bot.session.make_request.await_args.args[1]
+        assert isinstance(download, SendDocument)
+        assert download.chat_id == ADMIN.id
+        assert PreparedTransaction.model_validate_json(
+            download.document.data
+        ) == fulfillment.prepared(order.id)
         calls = [call.args[1] for call in bot.session.make_request.await_args_list]
         assert any(isinstance(call, AnswerCallbackQuery) for call in calls)
         await dispatcher.fsm.close()

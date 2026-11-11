@@ -42,6 +42,8 @@ def parser() -> argparse.ArgumentParser:
     refund_exception.add_argument("charge_id")
     for name, help_text in (
         ("order", "Показать заказ"),
+        ("prepared", "Выгрузить PreparedTransaction для внешней подписи"),
+        ("resolve-prepared", "Записать результат внешней транзакции после сверки"),
         ("approve", "Поставить оплаченный заказ в очередь"),
         ("reconcile", "Сверить исходную выдачу через Fragment"),
         ("refund", "Вернуть платёж через исходного провайдера"),
@@ -52,6 +54,9 @@ def parser() -> argparse.ArgumentParser:
         command.add_argument("id")
         if name == "approve":
             command.add_argument("--now", action="store_true", help="Выполнить выдачу из консоли")
+        if name == "resolve-prepared":
+            command.add_argument("outcome", choices=["delivered", "not_broadcast"])
+            command.add_argument("--evidence", required=True, help="Хеш или ссылка и основание")
         if name == "resolve":
             command.add_argument("outcome", choices=["settled", "not_broadcast"])
             command.add_argument("--evidence", required=True, help="Хеш или ссылка и основание")
@@ -74,9 +79,7 @@ async def execute(args: argparse.Namespace) -> None:
         await run_bot(config, store)
     elif command == "doctor":
         if config.mode == "live":
-            async with fulfillment.client(payer=True) as client:
-                if args.online:
-                    await client.get_profile()
+            await fulfillment.check_live(online=args.online)
         if args.online:
             async with make_bot(config) as bot:
                 info = await bot.get_me()
@@ -110,12 +113,20 @@ async def execute(args: argparse.Namespace) -> None:
         print(json.dumps(store.payment_exceptions(), ensure_ascii=False, indent=2))
     elif command == "order":
         print(store.get(args.id).summary(admin=True))
+    elif command == "prepared":
+        print(fulfillment.prepared(args.id).model_dump_json(indent=2))
+    elif command == "resolve-prepared":
+        order = await fulfillment.resolve_prepared(args.id, args.outcome, args.evidence)
+        print(order.summary(admin=True))
     elif command == "approve":
         order = store.approve(args.id)
         if args.now:
             claimed = store.claim(order.id)
             order = await fulfillment.deliver(claimed) if claimed else store.get(order.id)
-        print(order.summary(admin=True))
+        if args.now and order.state == "prepared":
+            print(fulfillment.prepared(order.id).model_dump_json(indent=2))
+        else:
+            print(order.summary(admin=True))
     elif command == "reconcile":
         print((await fulfillment.reconcile(args.id)).summary(admin=True))
     elif command == "resolve":
