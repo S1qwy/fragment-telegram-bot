@@ -105,8 +105,11 @@ async def poll(bot: Bot, dispatcher: Dispatcher, checkout: Checkout, schedule: C
                         )
                         if isinstance(message, Message):
                             await bot.send_message(message.chat.id, str(exc), request_timeout=3)
-                    except TelegramAPIError:
-                        log.info("Telegram could not complete a storefront action")
+                    except TelegramAPIError as exc:
+                        log.warning(
+                            "Telegram could not complete a storefront action (%s)",
+                            type(exc).__name__,
+                        )
                 offset = update.update_id + 1
         except TelegramRetryAfter as exc:
             await asyncio.sleep(exc.retry_after)

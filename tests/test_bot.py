@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from aiogram import Bot, Dispatcher
+from aiogram.exceptions import TelegramNetworkError
 from aiogram.methods import (
     AnswerCallbackQuery,
     EditMessageCaption,
@@ -200,3 +201,30 @@ async def test_telegram_xtr_invoice_pre_checkout_and_receipt(tmp_path):
         assert store.get(order.id).state == "paid"
         assert store.get(order.id).charge_id == "charge"
         assert not store.payment_exceptions()
+
+
+async def test_start_falls_back_to_menu_when_banner_upload_times_out(tmp_path):
+    config = Config("demo", tmp_path, token="123:dummy")
+    store = Store(tmp_path, config.mode)
+    bot = Bot(config.token)
+    async with bot:
+
+        async def request(_bot, method, timeout=None):
+            if isinstance(method, SendPhoto):
+                assert timeout == 4
+                raise TelegramNetworkError(method=method, message="Request timeout error")
+            return True
+
+        bot.session.make_request = AsyncMock(side_effect=request)
+        checkout = Checkout(store, DemoGateway(bot))
+        dispatcher = Dispatcher()
+        dispatcher.include_router(shop_router(config, store, checkout, Fulfillment(config, store)))
+        try:
+            await dispatcher.feed_update(bot, Update(update_id=1, message=chat_message("/start")))
+            photo, menu = (call.args[1] for call in bot.session.make_request.await_args_list)
+            assert isinstance(photo, SendPhoto)
+            assert isinstance(menu, SendMessage)
+            assert menu.text == photo.caption
+            assert menu.reply_markup == photo.reply_markup
+        finally:
+            await dispatcher.fsm.close()

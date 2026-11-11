@@ -4,7 +4,12 @@ from pathlib import Path
 
 from aiogram import Bot
 from aiogram.enums import ParseMode
-from aiogram.exceptions import TelegramAPIError, TelegramBadRequest
+from aiogram.exceptions import (
+    TelegramAPIError,
+    TelegramBadRequest,
+    TelegramNetworkError,
+    TelegramServerError,
+)
 from aiogram.types import FSInputFile, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from .catalog import Product
@@ -125,11 +130,14 @@ async def screen(
         await clear_actions(message)
     elif banner and banner.is_file() and len(text.encode("utf-16-le")) // 2 <= 1024:
         try:
-            await message.answer_photo(
+            photo = message.answer_photo(
                 FSInputFile(banner), caption=text, parse_mode=ParseMode.HTML, reply_markup=markup
             )
-        except TelegramBadRequest:
-            log.warning("Telegram rejected the shop banner")
+            await message.bot(photo, request_timeout=4)
+        except (TelegramBadRequest, TelegramNetworkError, TelegramServerError) as exc:
+            log.warning(
+                "Shop banner unavailable, sending the menu as text (%s)", type(exc).__name__
+            )
         else:
             return
     await message.answer(text, parse_mode=ParseMode.HTML, reply_markup=markup)
