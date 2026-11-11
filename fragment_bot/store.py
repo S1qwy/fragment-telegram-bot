@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from uuid import uuid4
 
-from .catalog import DEMO_PRODUCTS, SETTINGS, Product, setting_value
+from .catalog import DEMO_PRODUCTS, DEMO_SETTINGS, SETTINGS, Product, setting_value
 from .config import Mode, ShopError
 
 SCHEMA = """
@@ -142,15 +142,14 @@ class Store:
             db.executescript(SCHEMA)
             db.execute("BEGIN IMMEDIATE")
             row = db.execute("SELECT value FROM metadata WHERE key='mode'").fetchone()
-            if row:
-                if row["value"] != mode:
-                    raise ShopError("Для другого SHOP_MODE укажите отдельный DATA_DIR.")
-            else:
+            if row and row["value"] != mode:
+                raise ShopError("Для другого SHOP_MODE укажите отдельный DATA_DIR.")
+            db.executemany(
+                "INSERT OR IGNORE INTO settings VALUES (?, ?)",
+                [(key, value) for key, (value, _) in SETTINGS.items()],
+            )
+            if row is None:
                 db.execute("INSERT INTO metadata VALUES ('mode', ?)", (mode,))
-                db.executemany(
-                    "INSERT INTO settings VALUES (?, ?)",
-                    [(key, value) for key, (value, _) in SETTINGS.items()],
-                )
                 if mode != "live":
                     db.executemany(
                         "INSERT INTO products VALUES (?, ?, ?)",
@@ -189,7 +188,33 @@ class Store:
                     raise ShopError("Перед открытием укажите terms и support.")
                 if not db.execute("SELECT 1 FROM products LIMIT 1").fetchone():
                     raise ShopError("Перед открытием добавьте товар.")
+            if self.mode == "live" and key in {"terms", "support"} and not value:
+                opened = db.execute("SELECT value FROM settings WHERE key='open'").fetchone()
+                if opened["value"] == "1":
+                    raise ShopError("Закройте витрину перед очисткой условий или поддержки.")
             db.execute("UPDATE settings SET value=? WHERE key=?", (value, key))
+
+    def reset_setting(self, key: str) -> None:
+        if key not in SETTINGS:
+            raise ShopError("Неизвестная настройка.")
+        self.configure(key, SETTINGS[key][0])
+
+    def apply_demo_settings(self, overwrite: bool = False) -> tuple[str, ...]:
+        if self.mode == "live":
+            raise ShopError("Тестовые настройки доступны в режимах demo и test.")
+        with self.connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            configured = dict(db.execute("SELECT key, value FROM settings"))
+            changed = tuple(
+                key
+                for key, value in DEMO_SETTINGS.items()
+                if configured[key] != value and (overwrite or configured[key] == SETTINGS[key][0])
+            )
+            db.executemany(
+                "UPDATE settings SET value=? WHERE key=?",
+                [(setting_value(key, DEMO_SETTINGS[key]), key) for key in changed],
+            )
+        return changed
 
     def products(self) -> list[Product]:
         with self.connection() as db:
@@ -329,7 +354,8 @@ class Store:
                 db.execute(
                     "UPDATE orders SET checkout_id=? WHERE id=? AND buyer=? AND price=? AND provider=? AND currency=? "
                     "AND state='unpaid' AND (checkout_id IS NULL OR checkout_id=?) "
-                    "AND created_at >= datetime('now', '-30 minutes') "
+                    "AND created_at >= datetime('now', printf('-%d minutes', "
+                    "(SELECT value FROM settings WHERE key='checkout_minutes'))) "
                     "AND (SELECT value FROM settings WHERE key='open')='1'",
                     (query_id, order_id, buyer, price, provider, currency, query_id),
                 ).rowcount

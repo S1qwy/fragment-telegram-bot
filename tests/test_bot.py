@@ -287,3 +287,81 @@ async def test_admin_falls_back_from_rich_and_unavailable_custom_icons(tmp_path)
             assert classic.reply_markup.inline_keyboard[0][0].callback_data == "admin:queue"
         finally:
             await dispatcher.fsm.close()
+
+
+async def test_storefront_applies_menu_order_documents_and_gift_policy(tmp_path):
+    config = Config("demo", tmp_path, token="123:dummy")
+    store = Store(tmp_path, config.mode)
+    store.configure("home_style", "text")
+    store.configure("premium_icons", "premium_only")
+    store.configure("buy_label", "Выбрать пакет")
+    store.configure("home_buttons", "privacy,orders")
+    store.configure("privacy", "Текст конфиденциальности")
+    store.configure("category_order", "ton,stars,premium")
+    store.configure("allow_self", "0")
+    buyer = BUYER.model_copy(update={"username": "testbuyer"})
+
+    async with Bot(config.token) as bot:
+        bot.session.make_request = AsyncMock(return_value=True)
+        checkout = Checkout(store, DemoGateway(bot))
+        dispatcher = Dispatcher()
+        dispatcher.include_router(shop_router(config, store, checkout, Fulfillment(config, store)))
+
+        async def callback(data):
+            await dispatcher.feed_update(
+                bot,
+                Update(
+                    update_id=1,
+                    callback_query=CallbackQuery(
+                        id="callback",
+                        from_user=buyer,
+                        chat_instance="chat",
+                        data=data,
+                        message=chat_message(user=buyer),
+                    ),
+                ),
+            )
+
+        try:
+            await dispatcher.feed_update(
+                bot, Update(update_id=1, message=chat_message("/start", user=buyer))
+            )
+            home = bot.session.make_request.await_args.args[1]
+            assert isinstance(home, SendMessage)
+            assert home.reply_markup.inline_keyboard[0][0].text == "Выбрать пакет"
+            assert [b.callback_data for b in home.reply_markup.inline_keyboard[1]] == [
+                "privacy",
+                "orders",
+            ]
+
+            await callback("privacy")
+            assert "Текст конфиденциальности" in bot.session.make_request.await_args.args[1].text
+            await callback("catalog")
+            assert (
+                bot.session.make_request.await_args.args[1]
+                .reply_markup.inline_keyboard[0][0]
+                .callback_data
+                == "category:ton"
+            )
+            await callback("buy:stars:50")
+            recipient = bot.session.make_request.await_args.args[1]
+            assert all(
+                b.callback_data != "recipient:self"
+                for row in recipient.reply_markup.inline_keyboard
+                for b in row
+            )
+            await dispatcher.feed_update(
+                bot, Update(update_id=2, message=chat_message("@giftuser", user=buyer))
+            )
+            preview = next(
+                call.args[1]
+                for call in reversed(bot.session.make_request.await_args_list)
+                if isinstance(call.args[1], SendMessage)
+            )
+            confirmation = preview.reply_markup.inline_keyboard[0][0].callback_data
+            store.configure("allow_gifts", "0")
+            with pytest.raises(ShopError, match="только для вашего"):
+                await callback(confirmation)
+            assert store.orders(buyer=buyer.id) == []
+        finally:
+            await dispatcher.fsm.close()

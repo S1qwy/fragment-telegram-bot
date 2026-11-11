@@ -43,6 +43,8 @@ uv run fragment-bot run
 
 В админ-панели есть вкладки заказов, поиск по номеру, получателю или Telegram ID, история платежей XTR и статистика по базе магазина. Панель поддерживает таблицы Rich Messages, как в [Bedolaga](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/blob/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/utils/rich_menu.py). Набор иконок составлен по [Telegram Premium Emojis](https://github.com/abbosahmad/telegram-premium-emojis#-catalog--top-25-essential-ids) и публичному набору [TgAndroidIcons](https://t.me/addemoji/TgAndroidIcons). На боте, которому Telegram разрешает пользовательские эмодзи, они отображаются в кнопках. При ошибке рендер переключается на обычное меню. Через `SHOP_RICH_MENUS=0` и `SHOP_PREMIUM_ICONS=0` их можно выключить.
 
+В разделе «Настройки» можно менять оформление, порядок меню и каталога, правила заказа и тексты для покупателей. Для безопасного прогона есть [готовые тестовые настройки](docs/demo-settings.md). Подход к разделам и параметрам меню основан на [конструкторе меню Bedolaga](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/blob/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/services/menu_layout/constants.py).
+
 ## Управление из консоли
 
 ```sh

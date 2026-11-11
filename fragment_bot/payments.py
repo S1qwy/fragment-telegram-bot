@@ -1,18 +1,30 @@
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
 
 from aiogram import Bot
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.client.telegram import TelegramAPIServer
-from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramAPIError, TelegramBadRequest
+from aiogram.methods import SendInvoice
 from aiogram.types import InlineKeyboardButton, LabeledPrice
 from aiogram.utils.token import TokenValidationError
 
 from .catalog import Product, username
 from .config import Config, ShopError
 from .store import Order, Store
-from .views import back, button, keys, order_card, price
+from .views import (
+    IconPreference,
+    back,
+    button,
+    keys,
+    order_card,
+    price,
+    render_markup,
+    request_with_icon_fallback,
+    resolve_icon_mode,
+    send_html,
+)
 
 
 @dataclass(frozen=True)
@@ -36,9 +48,15 @@ class PaymentGateway(Protocol):
 
 
 class Checkout:
-    def __init__(self, store: Store, gateway: PaymentGateway) -> None:
+    def __init__(
+        self, store: Store, gateway: PaymentGateway, *, inherited_icons: bool = False
+    ) -> None:
         self.store = store
         self.gateway = gateway
+        self.inherited_icons = inherited_icons
+
+    def icon_mode(self) -> IconPreference:
+        return resolve_icon_mode(self.store.settings()["premium_icons"], self.inherited_icons)
 
     def create(self, buyer: int, product: Product, recipient: str, terms: str) -> Order:
         return self.store.create_order(
@@ -75,20 +93,24 @@ class DemoGateway:
     name = "demo"
     currency = "XTR"
 
-    def __init__(self, bot: Bot | None = None) -> None:
+    def __init__(
+        self, bot: Bot | None = None, *, icons: Callable[[], IconPreference] | None = None
+    ) -> None:
         self.bot = bot
+        self.icons = icons
 
     async def checkout(self, order: Order) -> None:
         if self.bot is None:
             raise ShopError("Для отправки счёта нужен запущенный бот.")
-        await self.bot.send_message(
+        await send_html(
+            self.bot,
             order.buyer,
             "<b>🧪 Тестовый счёт</b>\n\n" + order_card(order),
-            parse_mode=ParseMode.HTML,
-            reply_markup=keys(
+            keys(
                 [button("💳 Имитировать оплату", f"demo:{order.id}", style="success")],
                 back("orders", "К заказам"),
             ),
+            icons=self.icons() if self.icons else False,
         )
 
     async def refund(self, buyer: int, charge_id: str) -> None:
@@ -110,27 +132,35 @@ class TelegramStarsGateway:
     name = "telegram_stars"
     currency = "XTR"
 
-    def __init__(self, bot: Bot) -> None:
+    def __init__(self, bot: Bot, *, icons: Callable[[], IconPreference] | None = None) -> None:
         self.bot = bot
+        self.icons = icons
 
     async def checkout(self, order: Order) -> None:
-        await self.bot.send_invoice(
-            chat_id=order.buyer,
-            title=order.product.label,
-            description=f"Получатель @{order.recipient} · заказ #{order.id}",
-            payload=order.id,
-            currency=order.currency,
-            prices=[LabeledPrice(label=order.product.label, amount=order.price)],
-            provider_token="",
-            start_parameter=f"order-{order.id}",
-            reply_markup=keys(
-                [
-                    InlineKeyboardButton(
-                        text=f"Оплатить {price(order.price)}", pay=True, style="success"
-                    )
-                ],
-                back("orders", "К заказам"),
+        icons = self.icons() if self.icons else False
+        markup = keys(
+            [
+                InlineKeyboardButton(
+                    text=f"Оплатить {price(order.price)}", pay=True, style="success"
+                )
+            ],
+            back("orders", "К заказам"),
+        )
+        fallback = render_markup(markup, "off" if icons == "premium_only" else "unicode")
+        await request_with_icon_fallback(
+            self.bot,
+            SendInvoice(
+                chat_id=order.buyer,
+                title=order.product.label,
+                description=f"Получатель @{order.recipient} · заказ #{order.id}",
+                payload=order.id,
+                currency=order.currency,
+                prices=[LabeledPrice(label=order.product.label, amount=order.price)],
+                provider_token="",
+                start_parameter=f"order-{order.id}",
+                reply_markup=render_markup(markup, icons),
             ),
+            {"reply_markup": fallback} if icons in {True, "premium", "premium_only"} else None,
         )
 
     async def refund(self, buyer: int, charge_id: str) -> None:
@@ -169,9 +199,15 @@ def make_bot(config: Config) -> Bot:
         raise ShopError("Проверьте URL прокси TELEGRAM_PROXY в .env.") from None
 
 
-def make_gateway(config: Config, bot: Bot | None = None) -> PaymentGateway:
+def make_gateway(
+    config: Config, bot: Bot | None = None, *, store: Store | None = None
+) -> PaymentGateway:
+    def icons() -> IconPreference:
+        preference = store.settings()["premium_icons"] if store is not None else "inherit"
+        return resolve_icon_mode(preference, config.premium_icons)
+
     if config.mode == "demo":
-        return DemoGateway(bot)
+        return DemoGateway(bot, icons=icons)
     if bot is None:
         raise ShopError("Для платежей XTR нужен BOT_TOKEN.")
-    return TelegramStarsGateway(bot)
+    return TelegramStarsGateway(bot, icons=icons)

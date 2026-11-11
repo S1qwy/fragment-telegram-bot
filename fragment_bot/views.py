@@ -1,17 +1,21 @@
 import logging
+import re
 from html import escape
 from pathlib import Path
+from typing import Literal, cast
+from unicodedata import category
 
 from aiogram import Bot
 from aiogram.enums import ParseMode
 from aiogram.exceptions import (
     TelegramAPIError,
     TelegramBadRequest,
+    TelegramForbiddenError,
     TelegramNetworkError,
     TelegramNotFound,
     TelegramServerError,
 )
-from aiogram.methods import EditMessageText, SendRichMessage
+from aiogram.methods import EditMessageText, SendMessage, SendRichMessage, TelegramMethod
 from aiogram.types import (
     FSInputFile,
     InlineKeyboardButton,
@@ -44,16 +48,15 @@ STATUS_ICONS = {
 }
 
 
-# IDs checked through getCustomEmojiStickers and the public TgAndroidIcons pack.
+# Curated IDs verified via getStickerSet and getCustomEmojiStickers.
+# Sources: TgAndroidIcons, tgmacicons and vector_icons_by_fStikBot.
 PREMIUM_ICONS = {
     "🏪": "5983399041197675256",
-    "🛍": "5983399041197675256",
     "👤": "5771887475421090729",
     "💬": "5886666250158870040",
     "⚙": "5877260593903177342",
     "🛠": "5988023995125993550",
     "📄": "5839323457015256759",
-    "🧾": "5839323457015256759",
     "💳": "5967548335542767952",
     "⭐": "5874948844935974490",
     "💎": "5807465992363710697",
@@ -63,23 +66,142 @@ PREMIUM_ICONS = {
     "🔎": "5874960879434338403",
     "📥": "5877307202888273539",
     "✅": "5920052658743283381",
-    "‹": "5875082500023258804",
-    "ℹ": "5258503720928288433",
+    "⬅": "5875082500023258804",
+    "➡": "5877468380125990242",
+    "ℹ": "5879785854284599288",
+    "🏠": "5967822972931542886",
+    "🔒": "5832546462478635761",
+    "🛡": "5926783847453692661",
+    "❓": "5873121512445187130",
+    "📖": "5897850551156084824",
+    "📚": "5260512129240276089",
+    "📝": "5886330010054168711",
+    "🧪": "5897607722295103204",
+    "➕": "5877219383691972108",
+    "✏": "5879841310902324730",
+    "🔄": "5839200986022812209",
+    "🏷": "5854776233950188167",
+    "👋": "5994750571041525522",
+    "🕓": "5776213190387961618",
+    "⏲": "5960751816084820359",
+    "🖼": "5888799736508454231",
+    "🔔": "5909201569898827582",
+    "🟢": "5339135753316222622",
+    "🔴": "5967333011652350314",
+    "❌": "5778527486270770928",
+    "💰": "5811989245761426317",
+    "👁": "5960714428394507968",
+    "🔗": "5877465816030515018",
+    "🎁": "6032937473162614352",
+    "🚫": "5872829476143894491",
+    "⚡": "5843553939672274145",
 }
+_ICON_ALIASES = {
+    "🛍": "🏪",
+    "🧾": "📄",
+    "💠": "💎",
+    "‹": "⬅",
+    "›": "➡",
+    "↩": "⬅",
+    "↻": "🔄",
+    "+": "➕",
+    "＋": "➕",
+    "⏳": "⏲",
+    "🔐": "🔒",
+    "🔍": "🔎",
+}
+_VARIATION_EMOJI = frozenset("⭐⬅➡ℹ✏⏲⚡")
+_ACTION_ICONS = {"buy": "📦", "confirm": "✅", "invoice": "💳", "demo": "🧪"}
+_HEADING_ICON = re.compile(
+    r"(?P<start>^|\n|<b>|<h[1-6]>|<blockquote>|<p>)(?P<icon>[^\s<>]+) (?=\S)"
+)
+_XTR_SYMBOL = re.compile(r"(?<=\d) ⭐(?=[\s<]|$)")
+
+IconMode = Literal["premium", "premium_only", "unicode", "off"]
+IconPreference = IconMode | bool
+
+
+def resolve_icon_mode(preference: str, inherited: bool) -> IconMode:
+    if preference in {"premium", "premium_only", "unicode", "off"}:
+        return cast(IconMode, preference)
+    return "premium" if inherited else "unicode"
+
+
+def _icon_glyph(token: str) -> str:
+    normalized = token.replace("\ufe0f", "")
+    return _ICON_ALIASES.get(normalized, normalized)
+
+
+def _decorative(token: str) -> bool:
+    return _icon_glyph(token) in PREMIUM_ICONS or (
+        bool(token) and all(category(char) in {"So", "Sk", "Mn", "Cf"} for char in token)
+    )
+
+
+def render_markup(markup: InlineKeyboardMarkup, icons: IconPreference) -> InlineKeyboardMarkup:
+    mode = resolve_icon_mode("inherit", icons) if isinstance(icons, bool) else icons
+    if mode == "unicode":
+        if not any(item.icon_custom_emoji_id for row in markup.inline_keyboard for item in row):
+            return markup
+        return keys(
+            *[
+                [item.model_copy(update={"icon_custom_emoji_id": None}) for item in row]
+                for row in markup.inline_keyboard
+            ]
+        )
+    rows = []
+    for row in markup.inline_keyboard:
+        buttons = []
+        for item in row:
+            prefix, _, label = item.text.partition(" ")
+            decorative = bool(label) and _decorative(prefix)
+            suffix_arrow = item.text.endswith(" ›")
+            icon_id = None
+            if mode != "off":
+                glyph = (
+                    _icon_glyph(prefix)
+                    if decorative
+                    else (
+                        "➡"
+                        if suffix_arrow
+                        else _ACTION_ICONS.get((item.callback_data or "").partition(":")[0], "")
+                    )
+                )
+                icon_id = item.icon_custom_emoji_id or PREMIUM_ICONS.get(glyph)
+            text = (
+                label if decorative and (icon_id or mode in {"off", "premium_only"}) else item.text
+            )
+            if suffix_arrow and (icon_id or mode in {"off", "premium_only"}):
+                text = text.removesuffix(" ›")
+            if mode in {"off", "premium_only"}:
+                text = _XTR_SYMBOL.sub(" XTR", text)
+            buttons.append(item.model_copy(update={"text": text, "icon_custom_emoji_id": icon_id}))
+        rows.append(buttons)
+    return keys(*rows)
 
 
 def premium_markup(markup: InlineKeyboardMarkup) -> InlineKeyboardMarkup:
-    rows = []
-    for row in markup.inline_keyboard:
-        updated = []
-        for item in row:
-            prefix, _, label = item.text.partition(" ")
-            icon = PREMIUM_ICONS.get(prefix.replace("\ufe0f", ""))
-            if icon and label:
-                item = item.model_copy(update={"text": label, "icon_custom_emoji_id": icon})
-            updated.append(item)
-        rows.append(updated)
-    return keys(*rows)
+    return render_markup(markup, "premium")
+
+
+def render_text(html: str, icons: IconPreference) -> str:
+    mode = resolve_icon_mode("inherit", icons) if isinstance(icons, bool) else icons
+    if mode == "unicode":
+        return html
+
+    def replace(match: re.Match[str]) -> str:
+        token = match["icon"]
+        glyph = _icon_glyph(token)
+        icon_id = PREMIUM_ICONS.get(glyph)
+        if mode != "off" and icon_id:
+            fallback = glyph + ("\ufe0f" if glyph in _VARIATION_EMOJI else "")
+            return f'{match["start"]}<tg-emoji emoji-id="{icon_id}">{fallback}</tg-emoji> '
+        if mode in {"off", "premium_only"} and _decorative(token):
+            return match["start"]
+        return match[0]
+
+    result = _HEADING_ICON.sub(replace, html)
+    return _XTR_SYMBOL.sub(" XTR", result) if mode in {"off", "premium_only"} else result
 
 
 def rich_table(title: str, rows: list[tuple[str, str]], footer: str = "") -> str:
@@ -164,31 +286,58 @@ async def clear_actions(message: Message) -> None:
         pass
 
 
+async def request_with_icon_fallback(
+    bot: Bot,
+    method: TelegramMethod,
+    fallback: dict[str, object] | None,
+    *,
+    timeout: int | None = None,
+) -> None:
+    try:
+        await bot(method, request_timeout=timeout)
+    except (TelegramBadRequest, TelegramForbiddenError) as exc:
+        error = exc.message.lower()
+        if not fallback or not any(
+            term in error for term in ("emoji", "button", "entity", "entities")
+        ):
+            raise
+        await bot(method.model_copy(update=fallback), request_timeout=timeout)
+
+
+def _fallback_mode(mode: IconMode) -> IconMode:
+    return "off" if mode == "premium_only" else "unicode"
+
+
 async def screen(
     message: Message,
     text: str,
     markup: InlineKeyboardMarkup,
     *,
     edit: bool = False,
-    banner: Path | None = None,
+    banner: Path | str | None = None,
     rich: str | None = None,
-    icons: bool = False,
+    icons: IconPreference = False,
 ) -> None:
-    decorated = premium_markup(markup) if icons else markup
+    mode = resolve_icon_mode("inherit", icons) if isinstance(icons, bool) else icons
+    fallback_mode = _fallback_mode(mode)
+    decorated = render_markup(markup, mode)
+    fallback_markup = render_markup(markup, fallback_mode)
+    decorated_text = render_text(text, mode)
+    fallback_text = render_text(text, fallback_mode)
 
-    async def request(method, *, timeout: int | None = None):
-        try:
-            return await message.bot(method, request_timeout=timeout)
-        except TelegramBadRequest as exc:
-            error = exc.message.lower()
-            if decorated == markup or not any(term in error for term in ("emoji", "button")):
-                raise
-            return await message.bot(
-                method.model_copy(update={"reply_markup": markup}), request_timeout=timeout
-            )
+    async def request(
+        method: TelegramMethod, field: str, fallback_value, *, timeout: int | None = None
+    ):
+        fallback = None
+        if mode in {"premium", "premium_only"} and (
+            decorated != fallback_markup or getattr(method, field) != fallback_value
+        ):
+            fallback = {field: fallback_value, "reply_markup": fallback_markup}
+        await request_with_icon_fallback(message.bot, method, fallback, timeout=timeout)
 
     if rich and not (edit and message.photo):
-        rich_message = InputRichMessage(html=rich)
+        rich_message = InputRichMessage(html=render_text(rich, mode))
+        fallback_rich = InputRichMessage(html=render_text(rich, fallback_mode))
         if edit:
             method = EditMessageText(
                 chat_id=message.chat.id,
@@ -204,7 +353,7 @@ async def screen(
                 reply_markup=decorated,
             )
         try:
-            await request(method, timeout=4)
+            await request(method, "rich_message", fallback_rich, timeout=4)
             return
         except TelegramBadRequest as exc:
             if "message is not modified" in exc.message.lower():
@@ -213,46 +362,90 @@ async def screen(
         except (TelegramNotFound, TelegramNetworkError, TelegramServerError):
             log.info("Rich screen unavailable, using HTML")
 
+    caption_fits = len(decorated_text.encode("utf-16-le")) // 2 <= 1024
     if edit:
         try:
-            if message.photo and len(text.encode("utf-16-le")) // 2 <= 1024:
+            if message.photo and caption_fits:
                 await request(
                     message.edit_caption(
-                        caption=text, parse_mode=ParseMode.HTML, reply_markup=decorated
-                    )
+                        caption=decorated_text, parse_mode=ParseMode.HTML, reply_markup=decorated
+                    ),
+                    "caption",
+                    fallback_text,
                 )
                 return
             if not message.photo:
                 await request(
-                    message.edit_text(text, parse_mode=ParseMode.HTML, reply_markup=decorated)
+                    message.edit_text(
+                        decorated_text, parse_mode=ParseMode.HTML, reply_markup=decorated
+                    ),
+                    "text",
+                    fallback_text,
                 )
                 return
         except TelegramBadRequest as exc:
             if "message is not modified" in exc.message.lower():
                 return
         await clear_actions(message)
-    elif banner and banner.is_file() and len(text.encode("utf-16-le")) // 2 <= 1024:
-        try:
-            photo = message.answer_photo(
-                FSInputFile(banner), caption=text, parse_mode=ParseMode.HTML, reply_markup=decorated
-            )
-            await request(photo, timeout=4)
-        except (TelegramBadRequest, TelegramNetworkError, TelegramServerError) as exc:
-            log.warning(
-                "Shop banner unavailable, sending the menu as text (%s)", type(exc).__name__
-            )
-        else:
-            return
-    await request(message.answer(text, parse_mode=ParseMode.HTML, reply_markup=decorated))
+    elif caption_fits:
+        photo = None
+        if isinstance(banner, Path) and banner.is_file():
+            photo = FSInputFile(banner)
+        elif isinstance(banner, str) and banner.startswith("https://"):
+            photo = banner
+        if photo:
+            try:
+                method = message.answer_photo(
+                    photo, caption=decorated_text, parse_mode=ParseMode.HTML, reply_markup=decorated
+                )
+                await request(method, "caption", fallback_text, timeout=4)
+            except (TelegramBadRequest, TelegramNetworkError, TelegramServerError) as exc:
+                log.warning(
+                    "Shop banner unavailable, sending the menu as text (%s)", type(exc).__name__
+                )
+            else:
+                return
+    await request(
+        message.answer(decorated_text, parse_mode=ParseMode.HTML, reply_markup=decorated),
+        "text",
+        fallback_text,
+    )
 
 
-async def notify(bot: Bot, order: Order) -> None:
+async def send_html(
+    bot: Bot,
+    chat_id: int,
+    text: str,
+    markup: InlineKeyboardMarkup,
+    *,
+    icons: IconPreference = False,
+    request_timeout: int | None = None,
+) -> None:
+    mode = resolve_icon_mode("inherit", icons) if isinstance(icons, bool) else icons
+    method = SendMessage(
+        chat_id=chat_id,
+        text=render_text(text, mode),
+        parse_mode=ParseMode.HTML,
+        reply_markup=render_markup(markup, mode),
+    )
+    fallback = None
+    if mode in {"premium", "premium_only"}:
+        fallback_mode = _fallback_mode(mode)
+        fallback = {
+            "text": render_text(text, fallback_mode),
+            "reply_markup": render_markup(markup, fallback_mode),
+        }
+    await request_with_icon_fallback(bot, method, fallback, timeout=request_timeout)
+
+
+async def notify(bot: Bot, order: Order, *, icons: IconPreference = False) -> None:
     try:
-        await bot.send_message(
+        await send_html(
+            bot,
             order.buyer,
             order_card(order),
-            parse_mode=ParseMode.HTML,
-            reply_markup=buyer_order_keys(order),
+            buyer_order_keys(order),
+            icons=icons,
             request_timeout=3,
         )
     except TelegramAPIError:

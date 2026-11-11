@@ -18,7 +18,7 @@ from .fulfillment import Fulfillment
 from .payments import Checkout, PaymentReceipt, make_bot, make_gateway
 from .shop import shop_router
 from .store import Store
-from .views import notify
+from .views import notify, resolve_icon_mode
 
 log = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ async def handle_payment(bot: Bot, update: Update, checkout: Checkout) -> bool:
             log.info("Could not notify buyer about an unmatched payment")
     else:
         if captured:
-            await notify(bot, checkout.store.get(receipt.order_id))
+            await notify(bot, checkout.store.get(receipt.order_id), icons=checkout.icon_mode())
     return True
 
 
@@ -77,7 +77,10 @@ async def worker(bot: Bot, store: Store, fulfillment: Fulfillment) -> None:
             order = store.claim()
             if order is not None:
                 updated = await fulfillment.deliver(order)
-                await notify(bot, updated)
+                icons = resolve_icon_mode(
+                    store.settings()["premium_icons"], fulfillment.config.premium_icons
+                )
+                await notify(bot, updated, icons=icons)
                 continue
         except sqlite3.Error as exc:
             log.warning("Database error in fulfillment worker (%s)", type(exc).__name__)
@@ -136,6 +139,8 @@ async def run_bot(config: Config, store: Store) -> None:
             BotCommand(command="support", description="Поддержка"),
             BotCommand(command="paysupport", description="Помощь с оплатой"),
             BotCommand(command="terms", description="Условия магазина"),
+            BotCommand(command="faq", description="Частые вопросы"),
+            BotCommand(command="privacy", description="Конфиденциальность"),
             BotCommand(command="cancel", description="Отменить ввод"),
         ]
         await bot.set_my_commands(commands)
@@ -147,7 +152,9 @@ async def run_bot(config: Config, store: Store) -> None:
                 )
             except TelegramBadRequest:
                 log.info("Admin command menu will be available after the admin opens the bot")
-        checkout = Checkout(store, make_gateway(config, bot))
+        checkout = Checkout(
+            store, make_gateway(config, bot, store=store), inherited_icons=config.premium_icons
+        )
         dispatcher = Dispatcher()
         dispatcher.include_router(shop_router(config, store, checkout, fulfillment))
         background: dict[str, asyncio.Task] = {}

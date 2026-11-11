@@ -1,4 +1,3 @@
-from functools import partial
 from html import escape
 from secrets import token_hex
 
@@ -7,7 +6,7 @@ from aiogram.exceptions import TelegramAPIError, TelegramBadRequest
 from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import CallbackQuery, Message, User
+from aiogram.types import CallbackQuery, InlineKeyboardButton, Message, User
 
 from .admin import admin_router, show_order
 from .catalog import Product, username
@@ -27,10 +26,22 @@ from .views import (
     order_card,
     package,
     price,
+    resolve_icon_mode,
 )
 from .views import (
     screen as render_screen,
 )
+
+INFO_BUTTONS = {
+    "terms": ("📄", "Условия магазина"),
+    "faq": ("ℹ️", "Частые вопросы"),
+    "privacy": ("🔒", "Конфиденциальность"),
+}
+
+
+def check_recipient_policy(settings: dict[str, str], buyer: User, recipient: str) -> None:
+    if settings["allow_gifts"] == "0" and recipient != (buyer.username or "").lower():
+        raise ShopError("Магазин принимает заказы только для вашего @username.")
 
 
 class Draft(StatesGroup):
@@ -42,22 +53,33 @@ def shop_router(
     config: Config, store: Store, checkout: Checkout, fulfillment: Fulfillment
 ) -> Router:
     router = Router()
-    screen = partial(render_screen, icons=config.premium_icons)
     router.message.filter(F.chat.type == "private", F.from_user)
     router.callback_query.filter(
         lambda query: isinstance(query.message, Message) and query.message.chat.type == "private"
     )
     router.include_router(admin_router(config, store, checkout, fulfillment))
 
+    def current_icons():
+        return resolve_icon_mode(store.settings()["premium_icons"], config.premium_icons)
+
+    async def screen(message, text, markup, **kwargs):
+        await render_screen(message, text, markup, icons=current_icons(), **kwargs)
+
     async def home(message: Message, user: User, *, edit: bool = False) -> None:
         settings = store.settings()
-        rows = [
-            [button("🏪 Купить", "catalog", style="primary")],
-            [button("👤 Мои заказы", "orders"), button("💬 Поддержка", "support")],
-        ]
-        if settings["terms"]:
-            rows.append([button("📄 Условия магазина", "terms")])
-        orders = store.orders(buyer=user.id)
+        rows = [[button(f"🏪 {settings['buy_label']}", "catalog", style="primary")]]
+        actions = {
+            "orders": button("👤 Мои заказы", "orders"),
+            "support": button(f"💬 {settings['support_title']}", "support"),
+            **{
+                key: button(f"{icon} {label}", key)
+                for key, (icon, label) in INFO_BUTTONS.items()
+                if settings[key]
+            },
+        }
+        visible = [actions[key] for key in settings["home_buttons"].split(",") if key in actions]
+        rows.extend(visible[index : index + 2] for index in range(0, len(visible), 2))
+        orders = store.orders(buyer=user.id) if settings["show_recent_order"] == "1" else []
         last = ""
         if orders:
             order = orders[0]
@@ -67,14 +89,22 @@ def shop_router(
             )
         if user.id in config.admin_ids:
             rows.append([button("⚙️ Управление магазином", "admin")])
-        await screen(
-            message,
-            f"<b>{escape(settings['name'])}</b>\n\n{escape(settings['welcome'])}"
-            f"{last}{mode_note(config.mode)}",
-            keys(*rows),
-            edit=edit,
-            banner=config.banner_path,
-        )
+
+        name = escape(settings["name"])
+        tagline = escape(settings["tagline"])
+        welcome = escape(settings["welcome"])
+        blurb = f"<i>{tagline}</i>\n\n{welcome}" if tagline else welcome
+        text = f"<b>{name}</b>\n\n{blurb}{last}{mode_note(config.mode)}"
+        style = settings["home_style"]
+        banner = None
+        rich = None
+        if style == "cover":
+            banner = settings["banner_url"] or config.banner_path
+        elif style == "rich" and config.rich_menus:
+            rich = f"<h3>{name}</h3><p>{blurb.replace(chr(10), '<br>')}</p>{last}{mode_note(config.mode)}"
+            if settings["banner_url"]:
+                rich = f'<img src="{escape(settings["banner_url"], quote=True)}"/>{rich}'
+        await screen(message, text, keys(*rows), edit=edit, banner=banner, rich=rich)
 
     @router.message(CommandStart())
     async def start(message: Message, state: FSMContext) -> None:
@@ -88,24 +118,29 @@ def shop_router(
         await home(query.message, query.from_user, edit=True)
 
     async def catalog(message: Message, *, kind: str | None = None, edit: bool = False) -> None:
-        products = store.products()
-        if store.settings()["open"] != "1":
+        settings = store.settings()
+        title = f"<b>🛍 {escape(settings['catalog_title'])}</b>"
+        if settings["open"] != "1":
+            closed = escape(settings["closed_text"] or "Магазин сейчас закрыт.")
             await screen(
-                message, "<b>🛍 Каталог</b>\n\nМагазин сейчас закрыт.", keys(back()), edit=edit
+                message,
+                f"{title}\n\n{closed}",
+                keys([button(f"💬 {settings['support_title']}", "support")], back()),
+                edit=edit,
             )
             return
+        products = store.products()
         if kind is None:
             rows = []
-            for key, (icon, label, _) in PRODUCTS.items():
+            for key in settings["category_order"].split(","):
+                icon, label, _ = PRODUCTS[key]
                 prices = [item.price for item in products if item.kind == key]
                 if prices:
                     rows.append(
                         [button(f"{icon} {label} · от {price(min(prices))}", f"category:{key}")]
                     )
             description = "Выберите товар." if rows else "Каталог пока пуст."
-            await screen(
-                message, f"<b>🛍 Каталог</b>\n\n{description}", keys(*rows, back()), edit=edit
-            )
+            await screen(message, f"{title}\n\n{description}", keys(*rows, back()), edit=edit)
             return
         icon, label, description = PRODUCTS[kind]
         rows = [
@@ -147,20 +182,44 @@ def shop_router(
         await home(message, message.from_user)
 
     async def info(message: Message, kind: str, *, edit: bool = False) -> None:
-        if kind == "terms":
-            heading = "📄 Условия магазина"
-            rows = [back("support", "Поддержка")]
+        settings = store.settings()
+        rows = []
+        if kind == "support":
+            icon, heading = "💬", settings["support_title"]
+            if settings["support_url"]:
+                rows.append(
+                    [
+                        InlineKeyboardButton(
+                            text="💬 Связаться с поддержкой",
+                            url=settings["support_url"],
+                            style="primary",
+                        )
+                    ]
+                )
+            rows.extend(
+                [
+                    [button(f"{symbol} {label}", key)]
+                    for key, (symbol, label) in INFO_BUTTONS.items()
+                    if settings[key]
+                ]
+            )
+            rows.append(back())
         else:
-            heading = "💬 Поддержка"
-            rows = [[button("📄 Условия магазина", "terms")], back()]
-        value = store.settings()[kind] or "Магазин пока не указал эту информацию."
-        await screen(message, f"<b>{heading}</b>\n\n{escape(value)}", keys(*rows), edit=edit)
+            icon, heading = INFO_BUTTONS[kind]
+            rows.append(back("support", settings["support_title"]))
+        value = settings[kind] or "Магазин пока не указал эту информацию."
+        await screen(
+            message,
+            f"<b>{icon} {escape(heading)}</b>\n\n{escape(value)}",
+            keys(*rows),
+            edit=edit,
+        )
 
-    @router.message(Command("support", "paysupport", "terms"))
+    @router.message(Command("support", "paysupport", "terms", "faq", "privacy"))
     async def info_command(message: Message, command: CommandObject) -> None:
-        await info(message, "terms" if command.command == "terms" else "support")
+        await info(message, "support" if command.command == "paysupport" else command.command)
 
-    @router.callback_query(F.data.in_({"support", "terms"}))
+    @router.callback_query(F.data.in_({"support", *INFO_BUTTONS}))
     async def info_callback(query: CallbackQuery) -> None:
         await query.answer()
         await info(query.message, query.data, edit=True)
@@ -202,15 +261,20 @@ def shop_router(
         order = store.get(
             (command.args or "").strip(), buyer=None if admin else message.from_user.id
         )
-        await show_order(message, order, admin=admin, icons=config.premium_icons)
+        await show_order(message, order, admin=admin, icons=current_icons())
 
     @router.callback_query(F.data.startswith("show:"))
     async def order_callback(query: CallbackQuery) -> None:
         await query.answer()
         order = store.get(query.data.split(":", 1)[1], buyer=query.from_user.id)
-        await show_order(query.message, order, edit=True, icons=config.premium_icons)
+        await show_order(query.message, order, edit=True, icons=current_icons())
 
     async def ask_recipient(query: CallbackQuery, state: FSMContext, product: Product) -> None:
+        settings = store.settings()
+        if settings["allow_gifts"] == "0" and not query.from_user.username:
+            raise ShopError(
+                "Добавьте публичный @username в настройках Telegram, чтобы оформить заказ."
+            )
         await state.set_data(
             {
                 "kind": product.kind,
@@ -222,12 +286,16 @@ def shop_router(
         await state.set_state(Draft.recipient)
         icon, label, _ = PRODUCTS[product.kind]
         rows = []
-        if query.from_user.username:
+        if query.from_user.username and settings["allow_self"] == "1":
             rows.append([button("👤 Отправить себе", "recipient:self", style="primary")])
         await screen(
             query.message,
             f"<b>{icon} {label}</b>\n{package(product)} · <b>{price(product.price)}</b>\n\n"
-            "Пришлите <code>@username</code> получателя.",
+            + (
+                "Пришлите <code>@username</code> получателя."
+                if settings["allow_gifts"] == "1"
+                else "Пришлите свой <code>@username</code>."
+            ),
             keys(*rows, back(f"category:{product.kind}", "К пакетам")),
             edit=True,
         )
@@ -255,9 +323,10 @@ def shop_router(
         await ask_recipient(query, state, Product(data["kind"], data["quantity"], data["price"]))
 
     async def preview(
-        message: Message, state: FSMContext, value: str, *, edit: bool = False
+        message: Message, state: FSMContext, value: str, buyer: User, *, edit: bool = False
     ) -> None:
         recipient = username(value)
+        check_recipient_policy(store.settings(), buyer, recipient)
         data = await state.get_data()
         product = Product(data["kind"], data["quantity"], data["price"])
         name = await fulfillment.verify_recipient(product, recipient)
@@ -296,14 +365,16 @@ def shop_router(
 
     @router.message(Draft.recipient, F.text, ~F.text.startswith("/"))
     async def enter_recipient(message: Message, state: FSMContext) -> None:
-        await preview(message, state, message.text)
+        await preview(message, state, message.text, message.from_user)
 
     @router.callback_query(Draft.recipient, F.data == "recipient:self")
     async def send_to_self(query: CallbackQuery, state: FSMContext) -> None:
         await query.answer()
+        if store.settings()["allow_self"] != "1":
+            raise ShopError("Быстрый выбор отключён. Пришлите свой @username.")
         if not query.from_user.username:
             raise ShopError("У вашего аккаунта нет публичного @username.")
-        await preview(query.message, state, query.from_user.username, edit=True)
+        await preview(query.message, state, query.from_user.username, query.from_user, edit=True)
 
     @router.callback_query(F.data.in_({"recipient:self", "recipient:edit"}))
     async def expired_recipient(query: CallbackQuery) -> None:
@@ -316,6 +387,7 @@ def shop_router(
         if data.get("nonce") != query.data.split(":", 1)[1]:
             raise ShopError("Откройте товар заново через /catalog.")
         product = Product(data["kind"], data["quantity"], data["price"])
+        check_recipient_policy(store.settings(), query.from_user, data["recipient"])
         order = checkout.create(query.from_user.id, product, data["recipient"], data["terms"])
         await state.clear()
         try:

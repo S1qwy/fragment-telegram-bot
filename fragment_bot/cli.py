@@ -23,6 +23,13 @@ def parser() -> argparse.ArgumentParser:
     check = sub.add_parser("doctor", help="Проверить конфигурацию")
     check.add_argument("--online", action="store_true", help="Проверить Telegram и сессию Fragment")
     sub.add_parser("catalog", help="Показать товары")
+    sub.add_parser("settings", help="Показать настройки витрины")
+    reset = sub.add_parser("reset-setting", help="Восстановить значение настройки по умолчанию")
+    reset.add_argument("key", choices=SETTINGS)
+    preset = sub.add_parser("demo-settings", help="Применить тестовые тексты витрины")
+    preset.add_argument(
+        "--overwrite", action="store_true", help="Заменить ранее настроенные тексты"
+    )
     setting = sub.add_parser("set", help="Изменить настройку магазина")
     setting.add_argument("key", choices=SETTINGS)
     setting.add_argument("value")
@@ -91,6 +98,14 @@ async def execute(args: argparse.Namespace) -> None:
     elif command == "catalog":
         for product in store.products():
             print(f"{product.kind} {product.quantity} · {product.label} · {product.price} XTR")
+    elif command == "settings":
+        print(json.dumps(store.settings(), ensure_ascii=False, indent=2, sort_keys=True))
+    elif command == "reset-setting":
+        store.reset_setting(args.key)
+        print("Значение по умолчанию восстановлено.")
+    elif command == "demo-settings":
+        changed = store.apply_demo_settings(overwrite=args.overwrite)
+        print("Обновлены " + ", ".join(changed) if changed else "Тестовые значения уже заданы.")
     elif command == "set":
         store.configure(args.key, args.value)
         print("Настройка сохранена.")

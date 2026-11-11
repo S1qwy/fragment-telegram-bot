@@ -195,7 +195,7 @@ class Fulfillment:
                         order.kind,
                         order.recipient,
                         amount=order.quantity,
-                        show_sender=False,
+                        show_sender=self.store.settings()["show_sender"] == "1",
                     )
                 if mode == "prepare":
                     if not isinstance(result, PreparedTransaction) or not result.req_id:

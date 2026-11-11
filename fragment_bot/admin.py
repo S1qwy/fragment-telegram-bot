@@ -1,7 +1,6 @@
 import re
 from collections.abc import Callable
 from datetime import UTC, datetime
-from functools import partial
 from html import escape
 
 from aiogram import F, Router
@@ -14,6 +13,7 @@ from .catalog import Product, number
 from .config import Config, ShopError
 from .fulfillment import Fulfillment
 from .payments import Checkout
+from .settings_ui import build_settings_router
 from .store import ADMIN_PAGE_SIZE, STATUS, Order, Store
 from .views import (
     PRODUCTS,
@@ -26,6 +26,7 @@ from .views import (
     order_card,
     package,
     price,
+    resolve_icon_mode,
     rich_table,
 )
 from .views import (
@@ -40,11 +41,9 @@ ORDER_SECTIONS = {
     "payments": "История платежей",
 }
 ACTIONS = {"approve": "Подтвердить выдачу", "refund": "Вернуть оплату"}
-BRAND = {"name": "Название", "welcome": "Приветствие", "support": "Поддержка", "terms": "Условия"}
 
 
 class AdminInput(StatesGroup):
-    brand = State()
     product = State()
     search = State()
 
@@ -60,7 +59,7 @@ async def show_order(
     *,
     admin: bool = False,
     edit: bool = False,
-    icons: bool = False,
+    icons: bool | str = False,
     source: str = "",
 ) -> None:
     if not admin:
@@ -90,7 +89,13 @@ def admin_router(
     config: Config, store: Store, checkout: Checkout, fulfillment: Fulfillment
 ) -> Router:
     router = Router()
-    screen = partial(render_screen, icons=config.premium_icons)
+    router.include_router(build_settings_router(config, store))
+
+    def current_icons():
+        return resolve_icon_mode(store.settings()["premium_icons"], config.premium_icons)
+
+    async def screen(message, text, markup, **kwargs):
+        await render_screen(message, text, markup, icons=current_icons(), **kwargs)
 
     async def dashboard(message: Message, *, edit: bool = False) -> None:
         settings = store.settings()
@@ -259,7 +264,10 @@ def admin_router(
             edit=edit,
         )
 
-    @router.callback_query((F.data == "admin") | F.data.startswith("admin:"))
+    @router.callback_query(
+        (F.data == "admin")
+        | (F.data.startswith("admin:") & ~F.data.in_({"admin:settings", "admin:brand"}))
+    )
     async def navigate(query: CallbackQuery, state: FSMContext) -> None:
         await query.answer()
         admin_only(config, query.from_user.id)
@@ -273,30 +281,9 @@ def admin_router(
             await payment_home(query.message, edit=True)
         elif page == "admin:unmatched":
             await payment_errors(query.message, edit=True)
-        elif page in {"admin:settings", "admin:open", "admin:close"}:
-            if page != "admin:settings":
-                store.configure("open", "1" if page == "admin:open" else "0")
-            opened = store.settings()["open"] == "1"
-            status = "🟢 Витрина открыта" if opened else "🔴 Витрина закрыта"
-            await screen(
-                query.message,
-                f"<b>⚙️ Настройки</b>\n\n{status}",
-                keys(
-                    [
-                        button(
-                            "Закрыть витрину" if opened else "Открыть витрину",
-                            "admin:close" if opened else "admin:open",
-                            style="danger" if opened else "success",
-                        )
-                    ],
-                    [
-                        button("💬 Поддержка", "setting:support"),
-                        button("📄 Условия", "setting:terms"),
-                    ],
-                    back("admin", "Управление"),
-                ),
-                edit=True,
-            )
+        elif page in {"admin:open", "admin:close"}:
+            store.configure("open", "1" if page == "admin:open" else "0")
+            await dashboard(query.message, edit=True)
         elif page == "admin:stats":
             totals = store.shop_totals()
             rows = [
@@ -321,8 +308,29 @@ def admin_router(
             await screen(
                 query.message,
                 f"<b>🛠 Система</b>\n\n<blockquote>Режим  <code>{config.mode}</code>\n"
-                f"Telegram  {proxy}\nFragment  {fragment}\nАдминистраторов  {len(config.admin_ids)}</blockquote>",
-                keys(back("admin", "Управление")),
+                f"Telegram  {proxy}\nFragment  {fragment}\nАдминистраторов  {len(config.admin_ids)}\n"
+                f"Кошелёк  <code>{escape(config.wallet_version)}</code>\n"
+                f"Лимит выдачи  <b>{config.max_nanoton / 10**9:g} TON</b></blockquote>",
+                keys(
+                    [button("📄 Параметры запуска", "admin:environment")],
+                    back("admin", "Управление"),
+                ),
+                edit=True,
+            )
+        elif page == "admin:environment":
+            await screen(
+                query.message,
+                "<b>📄 Параметры запуска</b>\n\n"
+                "<b>Telegram</b>  <code>BOT_TOKEN</code>, <code>ADMIN_IDS</code>, <code>TELEGRAM_PROXY</code>\n"
+                "<b>Fragment</b>  <code>FRAGMENT_COOKIES</code>, <code>FRAGMENT_PROXY</code>, "
+                "<code>TON_SENDER_ACCOUNT</code>, <code>TON_SEED</code>, <code>TON_API_KEY</code>\n"
+                "<b>Кошелёк</b>  <code>TON_WALLET_VERSION</code>, <code>TON_MNEMONIC_TYPE</code>, "
+                "<code>TON_API_PROVIDER</code>, <code>FRAGMENT_MAX_TON</code>\n"
+                "<b>Запуск</b>  <code>SHOP_MODE</code>, <code>DATA_DIR</code>\n"
+                "<b>Внешний вид по умолчанию</b>  <code>SHOP_BANNER_FILE</code>, "
+                "<code>SHOP_RICH_MENUS</code>, <code>SHOP_PREMIUM_ICONS</code>\n\n"
+                "Параметры запуска читаются из локального файла <code>.env</code>.",
+                keys(back("admin:system", "К системе")),
                 edit=True,
             )
         elif page == "admin:search":
@@ -335,23 +343,6 @@ def admin_router(
             )
         elif page == "admin:catalog":
             await inventory(query.message, edit=True)
-        elif page == "admin:brand":
-            await screen(
-                query.message,
-                "<b>🎨 Оформление магазина</b>\n\nВыберите, что изменить.",
-                keys(
-                    [
-                        button("🏷 Название", "setting:name"),
-                        button("👋 Приветствие", "setting:welcome"),
-                    ],
-                    [
-                        button("💬 Поддержка", "setting:support"),
-                        button("📄 Условия", "setting:terms"),
-                    ],
-                    back("admin", "Управление"),
-                ),
-                edit=True,
-            )
         elif page == "admin:add":
             rows = [
                 [button(f"{icon} {label}", f"adminnew:{kind}")]
@@ -399,35 +390,6 @@ def admin_router(
             raise ShopError("Введите номер заказа, username или Telegram ID.")
         await state.clear()
         await orders_page(message, group="all", search=search)
-
-    @router.callback_query(F.data.startswith("setting:"))
-    async def edit_setting(query: CallbackQuery, state: FSMContext) -> None:
-        await query.answer()
-        admin_only(config, query.from_user.id)
-        key = query.data.split(":", 1)[1]
-        if key not in BRAND:
-            raise ShopError("Настройка недоступна.")
-        current = store.settings()[key] or "Пока пусто"
-        await state.set_data({"setting": key})
-        await state.set_state(AdminInput.brand)
-        await screen(
-            query.message,
-            f"<b>🎨 {BRAND[key]}</b>\n\n{escape(current)}\n\nПришлите новое значение.",
-            keys(back("admin:brand", "К оформлению")),
-            edit=True,
-        )
-
-    @router.message(AdminInput.brand, F.text, ~F.text.startswith("/"))
-    async def save_setting(message: Message, state: FSMContext) -> None:
-        admin_only(config, message.from_user.id)
-        key = (await state.get_data())["setting"]
-        store.configure(key, message.text)
-        await state.clear()
-        await screen(
-            message,
-            f"<b>✅ {BRAND[key]}</b>\n\nИзменение сохранено.",
-            keys(back("admin:brand", "К оформлению")),
-        )
 
     @router.callback_query(F.data.startswith("adminitem:"))
     async def product_details(query: CallbackQuery, state: FSMContext) -> None:
@@ -558,7 +520,7 @@ def admin_router(
             store.get(order_id),
             admin=True,
             edit=True,
-            icons=config.premium_icons,
+            icons=current_icons(),
             source=source,
         )
 
@@ -597,7 +559,7 @@ def admin_router(
                 store.approve(order_id),
                 admin=True,
                 edit=True,
-                icons=config.premium_icons,
+                icons=current_icons(),
             )
         elif action == "refund":
             order = store.get(order_id)
@@ -605,8 +567,8 @@ def admin_router(
             async def refund() -> None:
                 try:
                     updated = await fulfillment.refund(order.id, checkout.gateway)
-                    await notify(query.bot, updated)
-                    await show_order(query.message, updated, admin=True, icons=config.premium_icons)
+                    await notify(query.bot, updated, icons=current_icons())
+                    await show_order(query.message, updated, admin=True, icons=current_icons())
                 except ShopError as exc:
                     await query.message.answer(str(exc))
 
@@ -649,8 +611,8 @@ def admin_router(
         if outcome not in {"delivered", "not_broadcast"}:
             raise ShopError("Результат должен быть delivered или not_broadcast.")
         order = await fulfillment.resolve_prepared(order_id, outcome, evidence)
-        await show_order(message, order, admin=True, icons=config.premium_icons)
-        await notify(message.bot, order)
+        await show_order(message, order, admin=True, icons=current_icons())
+        await notify(message.bot, order, icons=current_icons())
 
     @router.message(Command("reconcile"))
     async def reconcile(message: Message, command: CommandObject, schedule: Callable) -> None:
@@ -660,9 +622,9 @@ def admin_router(
         async def check() -> None:
             try:
                 updated = await fulfillment.reconcile(order.id)
-                await show_order(message, updated, admin=True, icons=config.premium_icons)
+                await show_order(message, updated, admin=True, icons=current_icons())
                 if updated.state == "delivered" and order.state != "delivered":
-                    await notify(message.bot, updated)
+                    await notify(message.bot, updated, icons=current_icons())
             except ShopError as exc:
                 await message.answer(str(exc))
 
