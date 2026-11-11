@@ -24,6 +24,8 @@ uv run fragment-bot run
 
 В PowerShell для копирования используйте `Copy-Item .env.example .env`. С Docker Compose после заполнения `.env` запустите `docker compose up --build -d`. Команды управления доступны через `docker compose exec bot fragment-bot …`. Используйте один процесс Telegram polling на токен. SQLite с каталогом, платежами, заказами и журналом SDK хранится в `DATA_DIR` либо в томе Compose `shop-data`.
 
+При запуске через локальный прокси укажите его URL в `TELEGRAM_PROXY` и `FRAGMENT_PROXY`. Для процесса на той же машине подойдёт URL вида `http://127.0.0.1:10809`. В Docker укажите адрес прокси, доступный из контейнера.
+
 | Режим | Оплата | Выдача |
 | --- | --- | --- |
 | `demo` | Кнопка имитации или CLI | Имитация |

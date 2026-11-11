@@ -138,8 +138,10 @@ async def test_preparation_client_uses_public_account_without_wallet_credentials
         sender_account=account,
         seed="invalid-seed-that-the-prepare-client-must-ignore",
         api_key="configured-for-other-products",
+        fragment_proxy="http://127.0.0.1:10809",
     )
     async with Fulfillment(config, Store(tmp_path, "live")).client("prepare") as client:
         assert client.sender_account == account
+        assert client.proxy == config.fragment_proxy
         assert client.seed is None and client.api_key is None
         assert not client.has_wallet

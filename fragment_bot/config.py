@@ -29,6 +29,8 @@ class Config:
     wallet_version: str = "V5R1"
     mnemonic_type: str | None = None
     max_nanoton: int = 10_000_000_000
+    telegram_proxy: str | None = field(default=None, repr=False)
+    fragment_proxy: str | None = field(default=None, repr=False)
 
     @property
     def bot_id(self) -> int:
@@ -84,4 +86,6 @@ class Config:
             wallet_version=os.getenv("TON_WALLET_VERSION", "V5R1").strip(),
             mnemonic_type=os.getenv("TON_MNEMONIC_TYPE", "").strip() or None,
             max_nanoton=int(nanoton),
+            telegram_proxy=os.getenv("TELEGRAM_PROXY", "").strip() or None,
+            fragment_proxy=os.getenv("FRAGMENT_PROXY", "").strip() or None,
         )

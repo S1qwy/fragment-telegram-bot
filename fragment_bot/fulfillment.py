@@ -97,6 +97,7 @@ class Fulfillment:
                 sender_account=account,
                 api_key=self.config.api_key if mode == "pay" else None,
                 api_provider=self.config.api_provider,
+                proxy=self.config.fragment_proxy,
                 wallet_version=self.config.wallet_version,
                 mnemonic_type=self.config.mnemonic_type,
                 payment_storage=self.journal,

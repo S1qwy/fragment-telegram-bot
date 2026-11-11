@@ -100,11 +100,13 @@ async def test_demo_bot_checkout_and_admin_actions(tmp_path):
 
 
 async def test_telegram_xtr_invoice_pre_checkout_and_receipt(tmp_path):
-    config = Config("test", tmp_path, token="123:dummy")
+    proxy = "http://127.0.0.1:10809"
+    config = Config("test", tmp_path, token="123:dummy", telegram_proxy=proxy)
     store = Store(tmp_path, config.mode)
     bot = make_bot(config)
     async with bot:
         assert "/test/" in bot.session.api.api_url(bot.token, "getMe")
+        assert bot.session.proxy == proxy
         bot.session.make_request = AsyncMock(return_value=True)
         checkout = Checkout(store, TelegramStarsGateway(bot))
         order = checkout.create(BUYER.id, Product("premium", 3, 950), "@sample", "")

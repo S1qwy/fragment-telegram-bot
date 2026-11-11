@@ -154,9 +154,13 @@ def make_bot(config: Config) -> Bot:
             file="https://api.telegram.org/file/bot{token}/test/{path}",
         )
     try:
-        return Bot(config.token, session=AiohttpSession(api=api, timeout=8))
+        return Bot(
+            config.token, session=AiohttpSession(api=api, proxy=config.telegram_proxy, timeout=8)
+        )
     except TokenValidationError:
         raise ShopError("Укажите корректный BOT_TOKEN в .env.") from None
+    except ValueError:
+        raise ShopError("Проверьте URL прокси TELEGRAM_PROXY в .env.") from None
 
 
 def make_gateway(config: Config, bot: Bot | None = None) -> PaymentGateway:
