@@ -499,8 +499,9 @@ def admin_router(
         await dashboard(message)
 
     @router.message(Command("pending", "paymenterrors"))
-    async def admin_list(message: Message, command: CommandObject) -> None:
+    async def admin_list(message: Message, command: CommandObject, state: FSMContext) -> None:
         admin_only(config, message.from_user.id)
+        await state.clear()
         if command.command == "pending":
             await orders_page(message)
         else:
@@ -525,13 +526,14 @@ def admin_router(
         )
 
     @router.callback_query(F.data.startswith("ask:"))
-    async def ask_action(query: CallbackQuery) -> None:
+    async def ask_action(query: CallbackQuery, state: FSMContext) -> None:
         await query.answer()
         admin_only(config, query.from_user.id)
         _, action, order_id = query.data.split(":", 2)
         order = store.get(order_id)
         if action not in ACTIONS:
             raise ShopError("Неизвестное действие.")
+        await state.clear()
         await screen(
             query.message,
             f"<b>{ACTIONS[action]}?</b>\n\n{order_card(order, admin=True)}",
@@ -549,10 +551,11 @@ def admin_router(
         )
 
     @router.callback_query(F.data.startswith("act:"))
-    async def admin_action(query: CallbackQuery, schedule: Callable) -> None:
+    async def admin_action(query: CallbackQuery, schedule: Callable, state: FSMContext) -> None:
         await query.answer()
         admin_only(config, query.from_user.id)
         _, action, order_id = query.data.split(":", 2)
+        await state.clear()
         if action == "approve":
             await show_order(
                 query.message,
@@ -584,11 +587,12 @@ def admin_router(
             raise ShopError("Неизвестное действие.")
 
     @router.callback_query(F.data.startswith("prepared:"))
-    async def download_prepared(query: CallbackQuery) -> None:
+    async def download_prepared(query: CallbackQuery, state: FSMContext) -> None:
         await query.answer()
         admin_only(config, query.from_user.id)
         order_id = query.data.split(":", 1)[1]
         transaction = fulfillment.prepared(order_id)
+        await state.clear()
         document = BufferedInputFile(
             transaction.model_dump_json(indent=2).encode("utf-8"),
             filename=f"stars-{order_id}.json",

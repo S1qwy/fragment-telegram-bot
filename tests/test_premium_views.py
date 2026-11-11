@@ -54,3 +54,104 @@ async def test_premium_only_retries_with_plain_message_when_emoji_unavailable():
     assert plain.text == "<b>Условия</b>"
     assert plain.reply_markup.inline_keyboard[0][0].text == "Условия"
     assert plain.reply_markup.inline_keyboard[0][0].callback_data == "terms"
+
+
+async def test_home_cover_change_replaces_message_media():
+    from datetime import UTC, datetime
+
+    from aiogram import Bot
+    from aiogram.methods import EditMessageMedia
+    from aiogram.types import Chat, Message, PhotoSize
+
+    from fragment_bot.views import screen
+
+    bot = Bot("123:dummy")
+    async with bot:
+        bot.session.make_request = AsyncMock(return_value=True)
+        message = Message(
+            message_id=8,
+            date=datetime.now(UTC),
+            chat=Chat(id=1, type="private"),
+            photo=[PhotoSize(file_id="old", file_unique_id="old", width=400, height=200)],
+        ).as_(bot)
+        await screen(
+            message,
+            "<b>📄 Новый экран</b>",
+            keys([button("🏠 Главное меню", "menu")]),
+            edit=True,
+            banner="https://example.com/cover.jpg",
+            replace_media=True,
+            icons="premium_only",
+        )
+        request = bot.session.make_request.await_args.args[1]
+        assert isinstance(request, EditMessageMedia)
+        assert request.media.media == "https://example.com/cover.jpg"
+        assert "<tg-emoji" in request.media.caption
+        assert request.reply_markup.inline_keyboard[0][0].text == "Главное меню"
+
+
+async def test_home_text_style_removes_old_photo_after_successful_send():
+    from datetime import UTC, datetime
+
+    from aiogram import Bot
+    from aiogram.methods import DeleteMessage, SendMessage
+    from aiogram.types import Chat, Message, PhotoSize
+
+    from fragment_bot.views import screen
+
+    bot = Bot("123:dummy")
+    async with bot:
+        bot.session.make_request = AsyncMock(return_value=True)
+        message = Message(
+            message_id=8,
+            date=datetime.now(UTC),
+            chat=Chat(id=1, type="private"),
+            photo=[PhotoSize(file_id="old", file_unique_id="old", width=400, height=200)],
+        ).as_(bot)
+        await screen(
+            message,
+            "Текстовый экран",
+            keys([button("Главное меню", "menu")]),
+            edit=True,
+            replace_media=True,
+        )
+        sent, removed = [call.args[1] for call in bot.session.make_request.await_args_list]
+        assert isinstance(sent, SendMessage)
+        assert isinstance(removed, DeleteMessage)
+        assert removed.message_id == 8
+
+
+async def test_home_keeps_old_photo_when_replacement_send_fails():
+    from datetime import UTC, datetime
+
+    import pytest
+    from aiogram import Bot
+    from aiogram.exceptions import TelegramNetworkError
+    from aiogram.methods import SendMessage
+    from aiogram.types import Chat, Message, PhotoSize
+
+    from fragment_bot.views import screen
+
+    bot = Bot("123:dummy")
+    async with bot:
+
+        async def fail(_bot, method, timeout=None):
+            assert isinstance(method, SendMessage)
+            raise TelegramNetworkError(method=method, message="Request timeout error")
+
+        bot.session.make_request = AsyncMock(side_effect=fail)
+        message = Message(
+            message_id=8,
+            date=datetime.now(UTC),
+            chat=Chat(id=1, type="private"),
+            photo=[PhotoSize(file_id="old", file_unique_id="old", width=400, height=200)],
+        ).as_(bot)
+        with pytest.raises(TelegramNetworkError):
+            await screen(
+                message,
+                "Текстовый экран",
+                keys([button("Главное меню", "menu")]),
+                edit=True,
+                replace_media=True,
+            )
+        assert bot.session.make_request.await_count == 1

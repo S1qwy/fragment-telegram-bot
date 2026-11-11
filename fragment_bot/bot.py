@@ -11,7 +11,7 @@ from aiogram.exceptions import (
     TelegramRetryAfter,
     TelegramServerError,
 )
-from aiogram.types import BotCommand, BotCommandScopeChat, Message, Update
+from aiogram.types import BotCommand, BotCommandScopeChat, Message, Update, User
 
 from .config import Config, ShopError
 from .fulfillment import Fulfillment
@@ -84,6 +84,9 @@ async def worker(bot: Bot, store: Store, fulfillment: Fulfillment) -> None:
                 continue
         except sqlite3.Error as exc:
             log.warning("Database error in fulfillment worker (%s)", type(exc).__name__)
+        except TelegramAPIError as exc:
+            # Delivery is already persisted. Never repeat it because a notification failed.
+            log.warning("Could not notify buyer after fulfillment (%s)", type(exc).__name__)
         await asyncio.sleep(1)
 
 
@@ -121,6 +124,43 @@ async def poll(bot: Bot, dispatcher: Dispatcher, checkout: Checkout, schedule: C
             await asyncio.sleep(1)
 
 
+async def initialize_bot(bot: Bot, config: Config, store: Store) -> User:
+    delay = 1
+    while True:
+        try:
+            me = await bot.get_me()
+            store.bind_bot(me.id)
+            await bot.delete_webhook(drop_pending_updates=False)
+            commands = [
+                BotCommand(command="start", description="Главное меню"),
+                BotCommand(command="catalog", description="Каталог"),
+                BotCommand(command="orders", description="Мои заказы"),
+                BotCommand(command="support", description="Поддержка"),
+                BotCommand(command="paysupport", description="Помощь с оплатой"),
+                BotCommand(command="terms", description="Условия магазина"),
+                BotCommand(command="faq", description="Частые вопросы"),
+                BotCommand(command="privacy", description="Конфиденциальность"),
+                BotCommand(command="cancel", description="Отменить ввод"),
+            ]
+            await bot.set_my_commands(commands)
+            for user_id in config.admin_ids:
+                try:
+                    await bot.set_my_commands(
+                        commands
+                        + [BotCommand(command="admin", description="Управление магазином")],
+                        scope=BotCommandScopeChat(chat_id=user_id),
+                    )
+                except TelegramBadRequest:
+                    log.info("Admin command menu will be available after the admin opens the bot")
+            return me
+        except TelegramRetryAfter as exc:
+            await asyncio.sleep(exc.retry_after)
+        except (TelegramNetworkError, TelegramServerError) as exc:
+            log.warning("Telegram startup will retry in %ss (%s)", delay, type(exc).__name__)
+            await asyncio.sleep(delay)
+            delay = min(delay * 2, 30)
+
+
 async def run_bot(config: Config, store: Store) -> None:
     if not config.admin_ids:
         raise ShopError("Укажите хотя бы один ADMIN_IDS.")
@@ -129,29 +169,7 @@ async def run_bot(config: Config, store: Store) -> None:
         await fulfillment.check_live()
     bot = make_bot(config)
     async with bot:
-        me = await bot.get_me()
-        store.bind_bot(me.id)
-        await bot.delete_webhook(drop_pending_updates=False)
-        commands = [
-            BotCommand(command="start", description="Главное меню"),
-            BotCommand(command="catalog", description="Каталог"),
-            BotCommand(command="orders", description="Мои заказы"),
-            BotCommand(command="support", description="Поддержка"),
-            BotCommand(command="paysupport", description="Помощь с оплатой"),
-            BotCommand(command="terms", description="Условия магазина"),
-            BotCommand(command="faq", description="Частые вопросы"),
-            BotCommand(command="privacy", description="Конфиденциальность"),
-            BotCommand(command="cancel", description="Отменить ввод"),
-        ]
-        await bot.set_my_commands(commands)
-        for user_id in config.admin_ids:
-            try:
-                await bot.set_my_commands(
-                    commands + [BotCommand(command="admin", description="Управление магазином")],
-                    scope=BotCommandScopeChat(chat_id=user_id),
-                )
-            except TelegramBadRequest:
-                log.info("Admin command menu will be available after the admin opens the bot")
+        me = await initialize_bot(bot, config, store)
         checkout = Checkout(
             store, make_gateway(config, bot, store=store), inherited_icons=config.premium_icons
         )

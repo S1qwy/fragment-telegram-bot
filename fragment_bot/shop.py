@@ -104,7 +104,9 @@ def shop_router(
             rich = f"<h3>{name}</h3><p>{blurb.replace(chr(10), '<br>')}</p>{last}{mode_note(config.mode)}"
             if settings["banner_url"]:
                 rich = f'<img src="{escape(settings["banner_url"], quote=True)}"/>{rich}'
-        await screen(message, text, keys(*rows), edit=edit, banner=banner, rich=rich)
+        await screen(
+            message, text, keys(*rows), edit=edit, banner=banner, rich=rich, replace_media=edit
+        )
 
     @router.message(CommandStart())
     async def start(message: Message, state: FSMContext) -> None:
@@ -216,12 +218,14 @@ def shop_router(
         )
 
     @router.message(Command("support", "paysupport", "terms", "faq", "privacy"))
-    async def info_command(message: Message, command: CommandObject) -> None:
+    async def info_command(message: Message, command: CommandObject, state: FSMContext) -> None:
+        await state.clear()
         await info(message, "support" if command.command == "paysupport" else command.command)
 
     @router.callback_query(F.data.in_({"support", *INFO_BUTTONS}))
-    async def info_callback(query: CallbackQuery) -> None:
+    async def info_callback(query: CallbackQuery, state: FSMContext) -> None:
         await query.answer()
+        await state.clear()
         await info(query.message, query.data, edit=True)
 
     async def history(message: Message, user_id: int, *, edit: bool = False) -> None:
@@ -256,17 +260,19 @@ def shop_router(
         await history(query.message, query.from_user.id, edit=True)
 
     @router.message(Command("order"))
-    async def order_details(message: Message, command: CommandObject) -> None:
+    async def order_details(message: Message, command: CommandObject, state: FSMContext) -> None:
         admin = message.from_user.id in config.admin_ids
         order = store.get(
             (command.args or "").strip(), buyer=None if admin else message.from_user.id
         )
+        await state.clear()
         await show_order(message, order, admin=admin, icons=current_icons())
 
     @router.callback_query(F.data.startswith("show:"))
-    async def order_callback(query: CallbackQuery) -> None:
+    async def order_callback(query: CallbackQuery, state: FSMContext) -> None:
         await query.answer()
         order = store.get(query.data.split(":", 1)[1], buyer=query.from_user.id)
+        await state.clear()
         await show_order(query.message, order, edit=True, icons=current_icons())
 
     async def ask_recipient(query: CallbackQuery, state: FSMContext, product: Product) -> None:
@@ -397,17 +403,19 @@ def shop_router(
         await clear_actions(query.message)
 
     @router.callback_query(F.data.startswith("invoice:"))
-    async def resend_invoice(query: CallbackQuery) -> None:
+    async def resend_invoice(query: CallbackQuery, state: FSMContext) -> None:
         await query.answer()
         order = store.get(query.data.split(":", 1)[1], buyer=query.from_user.id)
         if order.state != "unpaid" or order.checkout_id or store.settings()["open"] != "1":
             raise ShopError("Счёт недоступен. Если оплата не прошла, создайте новый заказ.")
+        await state.clear()
         await checkout.gateway.checkout(order)
 
     @router.callback_query(F.data.startswith("demo:"))
-    async def demo_payment(query: CallbackQuery) -> None:
+    async def demo_payment(query: CallbackQuery, state: FSMContext) -> None:
         await query.answer()
         order = DemoGateway.pay(checkout, query.data.split(":", 1)[1], query.from_user.id)
+        await state.clear()
         await screen(query.message, order_card(order), buyer_order_keys(order), edit=True)
 
     return router

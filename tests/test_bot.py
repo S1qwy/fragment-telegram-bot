@@ -7,6 +7,7 @@ from aiogram.exceptions import TelegramBadRequest, TelegramNetworkError, Telegra
 from aiogram.methods import (
     AnswerCallbackQuery,
     EditMessageCaption,
+    EditMessageMedia,
     EditMessageText,
     SendDocument,
     SendMessage,
@@ -169,7 +170,9 @@ async def test_demo_bot_checkout_and_admin_actions(tmp_path):
             bot, Update(update_id=3, message=chat_message("Store <3", user=ADMIN))
         )
         await callback("menu", user=ADMIN)
-        assert "<b>Store &lt;3</b>" in bot.session.make_request.await_args.args[1].text
+        updated_home = bot.session.make_request.await_args.args[1]
+        assert isinstance(updated_home, EditMessageMedia)
+        assert "<b>Store &lt;3</b>" in updated_home.media.caption
         await callback("admin:catalog", user=ADMIN)
         await callback("adminitem:stars:50", user=ADMIN)
         await callback("adminprice:stars:50", user=ADMIN)

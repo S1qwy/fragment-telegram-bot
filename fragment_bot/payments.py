@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from aiogram import Bot
-from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.client.telegram import TelegramAPIServer
 from aiogram.exceptions import TelegramAPIError, TelegramBadRequest
 from aiogram.methods import SendInvoice
@@ -13,6 +12,7 @@ from aiogram.utils.token import TokenValidationError
 from .catalog import Product, username
 from .config import Config, ShopError
 from .store import Order, Store
+from .transport import ProxySession
 from .views import (
     IconPreference,
     back,
@@ -138,6 +138,10 @@ class TelegramStarsGateway:
 
     async def checkout(self, order: Order) -> None:
         icons = self.icons() if self.icons else False
+        label = order.product.label
+        if icons in {"premium_only", "off"}:
+            # Invoice titles and price labels do not support custom emoji entities.
+            label = label.replace(" ⭐", "")
         markup = keys(
             [
                 InlineKeyboardButton(
@@ -151,11 +155,11 @@ class TelegramStarsGateway:
             self.bot,
             SendInvoice(
                 chat_id=order.buyer,
-                title=order.product.label,
+                title=label,
                 description=f"Получатель @{order.recipient} · заказ #{order.id}",
                 payload=order.id,
                 currency=order.currency,
-                prices=[LabeledPrice(label=order.product.label, amount=order.price)],
+                prices=[LabeledPrice(label=label, amount=order.price)],
                 provider_token="",
                 start_parameter=f"order-{order.id}",
                 reply_markup=render_markup(markup, icons),
@@ -191,7 +195,7 @@ def make_bot(config: Config) -> Bot:
         )
     try:
         return Bot(
-            config.token, session=AiohttpSession(api=api, proxy=config.telegram_proxy, timeout=8)
+            config.token, session=ProxySession(api=api, proxy=config.telegram_proxy, timeout=8)
         )
     except TokenValidationError:
         raise ShopError("Укажите корректный BOT_TOKEN в .env.") from None

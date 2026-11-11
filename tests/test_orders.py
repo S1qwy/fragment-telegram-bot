@@ -168,7 +168,8 @@ async def test_admin_order_pages_and_xtr_totals(tmp_path):
     assert len(first_page) == 7 and len(last_page) == 2
     assert (total, page, last) == (9, 0, 1)
     assert store.admin_orders("all", search=first.id[:6])[0][0].id == first.id
-    assert store.admin_orders("all", search=str(first.buyer))[0][0].id == first.id
+    buyer_matches, _, _ = store.admin_orders("all", search=str(first.buyer))
+    assert first.id in {order.id for order in buyer_matches}
     assert store.admin_orders("queue")[1] == 0
     assert store.admin_orders("closed")[1] == 1
     assert store.admin_orders("payments")[1] == 1

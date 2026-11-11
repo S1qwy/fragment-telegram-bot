@@ -20,6 +20,7 @@ from aiogram.types import (
     FSInputFile,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
+    InputMediaPhoto,
     InputRichMessage,
     Message,
 )
@@ -134,7 +135,13 @@ def _icon_glyph(token: str) -> str:
 
 def _decorative(token: str) -> bool:
     return _icon_glyph(token) in PREMIUM_ICONS or (
-        bool(token) and all(category(char) in {"So", "Sk", "Mn", "Cf"} for char in token)
+        bool(token)
+        and all(
+            category(char) in {"So", "Sk", "Mn", "Cf"}
+            # Older Python Unicode tables classify newly added emoji as unassigned.
+            or (category(char) == "Cn" and "\U0001f000" <= char <= "\U0001faff")
+            for char in token
+        )
     )
 
 
@@ -317,6 +324,7 @@ async def screen(
     banner: Path | str | None = None,
     rich: str | None = None,
     icons: IconPreference = False,
+    replace_media: bool = False,
 ) -> None:
     mode = resolve_icon_mode("inherit", icons) if isinstance(icons, bool) else icons
     fallback_mode = _fallback_mode(mode)
@@ -334,6 +342,37 @@ async def screen(
         ):
             fallback = {field: fallback_value, "reply_markup": fallback_markup}
         await request_with_icon_fallback(message.bot, method, fallback, timeout=timeout)
+
+    caption_fits = len(decorated_text.encode("utf-16-le")) // 2 <= 1024
+    photo = None
+    if isinstance(banner, Path) and banner.is_file():
+        photo = FSInputFile(banner)
+    elif isinstance(banner, str) and banner.startswith("https://"):
+        photo = banner
+
+    if edit and replace_media and (message.photo or photo):
+        if photo and caption_fits and not rich:
+            media = InputMediaPhoto(media=photo, caption=decorated_text, parse_mode=ParseMode.HTML)
+            try:
+                await request(
+                    message.edit_media(media, reply_markup=decorated),
+                    "media",
+                    media.model_copy(update={"caption": fallback_text}),
+                    timeout=4,
+                )
+                return
+            except TelegramBadRequest as exc:
+                if "message is not modified" in exc.message.lower():
+                    return
+                log.info("Home cover could not be replaced, sending a fresh menu")
+            except (TelegramNetworkError, TelegramServerError):
+                log.info("Home cover update unavailable, sending a fresh menu")
+        await screen(message, text, markup, banner=banner, rich=rich, icons=icons)
+        try:
+            await message.delete()
+        except (TelegramBadRequest, TelegramForbiddenError):
+            await clear_actions(message)
+        return
 
     if rich and not (edit and message.photo):
         rich_message = InputRichMessage(html=render_text(rich, mode))
@@ -362,7 +401,6 @@ async def screen(
         except (TelegramNotFound, TelegramNetworkError, TelegramServerError):
             log.info("Rich screen unavailable, using HTML")
 
-    caption_fits = len(decorated_text.encode("utf-16-le")) // 2 <= 1024
     if edit:
         try:
             if message.photo and caption_fits:
@@ -388,11 +426,6 @@ async def screen(
                 return
         await clear_actions(message)
     elif caption_fits:
-        photo = None
-        if isinstance(banner, Path) and banner.is_file():
-            photo = FSInputFile(banner)
-        elif isinstance(banner, str) and banner.startswith("https://"):
-            photo = banner
         if photo:
             try:
                 method = message.answer_photo(
