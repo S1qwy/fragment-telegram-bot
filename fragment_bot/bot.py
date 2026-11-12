@@ -15,6 +15,7 @@ from aiogram.types import BotCommand, BotCommandScopeChat, Message, Update, User
 
 from .config import Config, ShopError
 from .fulfillment import Fulfillment
+from .payment_webhooks import start_webhooks
 from .payments import Checkout, PaymentReceipt, make_bot, make_gateway
 from .shop import shop_router
 from .store import Store
@@ -192,8 +193,9 @@ async def run_bot(config: Config, store: Store) -> None:
             background[order_id] = asyncio.create_task(run_action())
             return True
 
-        log.info("Started @%s in %s mode", me.username, config.mode)
+        webhook_runner = await start_webhooks(store) if config.mode == "live" else None
         fulfillment_worker = asyncio.create_task(worker(bot, store, fulfillment))
+        log.info("Started @%s in %s mode", me.username, config.mode)
         try:
             await poll(bot, dispatcher, checkout, schedule)
         finally:
@@ -202,3 +204,5 @@ async def run_bot(config: Config, store: Store) -> None:
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
             await dispatcher.fsm.close()
+            if webhook_runner is not None:
+                await webhook_runner.cleanup()

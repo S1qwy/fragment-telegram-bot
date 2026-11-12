@@ -13,6 +13,7 @@ from .catalog import Product, number
 from .config import Config, ShopError
 from .fulfillment import Fulfillment
 from .payments import Checkout
+from .provider_ui import provider_router
 from .settings_ui import build_settings_router
 from .store import ADMIN_PAGE_SIZE, STATUS, Order, Store
 from .views import (
@@ -90,6 +91,7 @@ def admin_router(
 ) -> Router:
     router = Router()
     router.include_router(build_settings_router(config, store))
+    router.include_router(provider_router(config, store))
 
     def current_icons():
         return resolve_icon_mode(store.settings()["premium_icons"], config.premium_icons)

@@ -10,3 +10,4 @@ dist/
 data/
 data-*/
 *.sqlite3*
+provider-settings.key

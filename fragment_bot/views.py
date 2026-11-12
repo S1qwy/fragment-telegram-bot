@@ -233,6 +233,8 @@ def back(action: str = "menu", text: str = "Назад") -> list[InlineKeyboardB
 
 
 def price(amount: int, currency: str = "XTR") -> str:
+    if currency != "XTR":
+        return f"{amount // 100:,}.{amount % 100:02d} {currency}".replace(",", " ")
     unit = "⭐" if currency == "XTR" else currency
     return f"{amount:,}".replace(",", " ") + f" {unit}"
 
@@ -275,7 +277,11 @@ def order_card(order: Order, *, admin: bool = False) -> str:
 
 def buyer_order_keys(order: Order) -> InlineKeyboardMarkup:
     rows = []
-    if order.state == "unpaid" and not order.checkout_id:
+    if (
+        order.state == "unpaid"
+        and not order.checkout_id
+        and order.provider in {"demo", "telegram_stars"}
+    ):
         rows.append([button("💳 Открыть счёт", f"invoice:{order.id}", style="primary")])
     rows.extend(
         [

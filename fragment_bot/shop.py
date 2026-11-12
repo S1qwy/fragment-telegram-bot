@@ -470,7 +470,12 @@ def shop_router(
     async def resend_invoice(query: CallbackQuery, state: FSMContext) -> None:
         await query.answer()
         order = store.get(query.data.split(":", 1)[1], buyer=query.from_user.id)
-        if order.state != "unpaid" or order.checkout_id or store.settings()["open"] != "1":
+        if (
+            order.provider != checkout.gateway.name
+            or order.state != "unpaid"
+            or order.checkout_id
+            or store.settings()["open"] != "1"
+        ):
             raise ShopError("Счёт недоступен. Если оплата не прошла, создайте новый заказ.")
         await state.clear()
         await checkout.gateway.checkout(order)

@@ -7,9 +7,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends git ca-certific
     && useradd --system --uid 10001 --create-home shop
 
 WORKDIR /app
-COPY pyproject.toml uv.lock README.md LICENSE ./
+COPY pyproject.toml uv.lock README.md LICENSE THIRD_PARTY_NOTICES.md ./
 COPY fragment_bot ./fragment_bot
-RUN uv sync --locked --no-dev --no-editable && mkdir /app/data && chown shop:shop /app/data
+RUN uv sync --locked --extra providers --no-dev --no-editable && mkdir /app/data && chown shop:shop /app/data
 ENV PATH="/app/.venv/bin:$PATH" DATA_DIR=/app/data PYTHONUNBUFFERED=1
 USER shop
 CMD ["fragment-bot", "run"]

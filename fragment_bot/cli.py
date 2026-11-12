@@ -4,6 +4,8 @@ import json
 import logging
 import sqlite3
 import sys
+from getpass import getpass
+from pathlib import Path
 
 from aiogram.exceptions import TelegramAPIError
 from FragmentAPI import FragmentError
@@ -11,8 +13,11 @@ from FragmentAPI import FragmentError
 from .bot import run_bot
 from .catalog import SETTINGS, Product, number
 from .config import Config, ShopError
+from .external_payments import HOSTED, ExternalGateway, available
 from .fulfillment import Fulfillment
 from .payments import Checkout, DemoGateway, make_bot, make_gateway
+from .provider_config import FIELDS, PROVIDERS, ProviderConfig
+from .providers import provider_call
 from .store import Store
 
 
@@ -20,6 +25,30 @@ def parser() -> argparse.ArgumentParser:
     cli = argparse.ArgumentParser(prog="fragment-bot", description="Управление магазином Fragment")
     sub = cli.add_subparsers(dest="command", required=True)
     sub.add_parser("run", help="Запустить бота и очередь выдачи")
+    sub.add_parser("providers", help="Все платёжные интеграции")
+    info = sub.add_parser("provider-info", help="Параметры и API провайдера (секреты скрыты)")
+    info.add_argument("provider", choices=PROVIDERS)
+    pset = sub.add_parser("provider-set", help="Сохранить параметр провайдера")
+    pset.add_argument("key", choices=FIELDS)
+    pset.add_argument("value", nargs="?")
+    preset = sub.add_parser("provider-reset", help="Сбросить параметр провайдера")
+    preset.add_argument("key", choices=FIELDS)
+    call = sub.add_parser("provider-call", help="Вызвать публичный API провайдера")
+    call.add_argument("provider", choices=PROVIDERS)
+    call.add_argument("method")
+    call.add_argument(
+        "--params-file", type=Path, required=True, help="JSON с именованными аргументами"
+    )
+    hosted = sub.add_parser("external-order", help="Создать счёт для заказа из внешнего канала")
+    hosted.add_argument("provider", choices=sorted(HOSTED))
+    hosted.add_argument("kind", choices=["stars", "premium", "ton"])
+    hosted.add_argument("quantity")
+    hosted.add_argument("recipient")
+    hosted.add_argument("--buyer", type=int, required=True)
+    hosted.add_argument("--email")
+    hosted.add_argument("--accept-terms", action="store_true", required=True)
+    for name in ("external-link", "external-check"):
+        sub.add_parser(name).add_argument("id")
     check = sub.add_parser("doctor", help="Проверить конфигурацию")
     check.add_argument("--online", action="store_true", help="Проверить Telegram и сессию Fragment")
     sub.add_parser("catalog", help="Показать товары")
@@ -82,7 +111,72 @@ async def execute(args: argparse.Namespace) -> None:
     command = args.command
     if config.token and command != "run":
         store.bind_bot(config.bot_id)
-    if command == "run":
+    if command == "external-order":
+        if config.mode != "live":
+            raise ShopError("Внешние счета требуют отдельной live-базы.")
+        if args.provider not in available(ProviderConfig(store)):
+            raise ShopError("Проверьте доступность, ключи и курс провайдера.")
+        if args.buyer <= 0:
+            raise ShopError("Укажите положительный Telegram ID покупателя.")
+        product = store.quote(args.kind, number(args.quantity, "Количество"))
+        gateway = ExternalGateway(store, args.provider, email=args.email)
+        order = Checkout(store, gateway).create(
+            args.buyer, product, args.recipient, store.settings()["terms"]
+        )
+        print(f"Order: {order.id}", file=sys.stderr, flush=True)
+        print(await gateway.checkout(order))
+    elif command in {"external-link", "external-check"}:
+        order = store.get(args.id)
+        gateway = ExternalGateway(store, order.provider)
+        if command == "external-link":
+            print(gateway.saved_link(order))
+        else:
+            if order.state == "unpaid":
+                await gateway.check(order)
+            print(store.get(order.id).summary(admin=True))
+    elif command.startswith("provider"):
+        configuration = ProviderConfig(store)
+        if command == "providers":
+            print("\n".join(sorted(PROVIDERS)))
+        elif command == "provider-info":
+            print(
+                json.dumps(
+                    {
+                        "settings": configuration.display(args.provider),
+                        "api": PROVIDERS[args.provider]["methods"],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+        elif command == "provider-set":
+            value = args.value
+            if value is None:
+                value = (
+                    getpass("Значение: ") if sys.stdin.isatty() else sys.stdin.read().rstrip("\r\n")
+                )
+            configuration.set(args.key, value)
+            print("Настройка провайдера сохранена.")
+        elif command == "provider-reset":
+            configuration.reset(args.key)
+            print("Настройка провайдера сброшена.")
+        elif command == "provider-call":
+            try:
+                params = json.loads(args.params_file.read_text("utf-8"))
+                if not isinstance(params, dict):
+                    raise ValueError
+            except (OSError, ValueError):
+                raise ShopError("Файл параметров должен содержать JSON-объект.") from None
+            try:
+                result = await provider_call(configuration, args.provider, args.method, params)
+            except ShopError:
+                raise
+            except Exception as error:
+                raise ShopError(
+                    f"API-запрос не завершён ({type(error).__name__}). Проверьте платёж в кабинете перед повтором."
+                ) from None
+            print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
+    elif command == "run":
         await run_bot(config, store)
     elif command == "doctor":
         if config.mode == "live":

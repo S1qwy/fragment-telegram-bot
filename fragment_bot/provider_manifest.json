@@ -1,0 +1,2688 @@
+{
+  "providers": {
+    "anore": {
+      "module": "anore",
+      "class": "AnoreService",
+      "methods": {
+        "snapshot": "",
+        "verify_callback_signature": "raw_body: bytes, signature: str, *, secret: str | None=None",
+        "create_payment": "self, *, amount_kopeks: int, description: str, order_id: str, methods: list[str] | None=None, email: str | None=None, success_url: str | None=None, fail_url: str | None=None, callback_url: str | None=None, config: AnoreConfig | None=None",
+        "get_payment": "self, payment_id: str, *, config: AnoreConfig | None=None"
+      }
+    },
+    "antilopay": {
+      "module": "antilopay",
+      "class": "AntilopayService",
+      "methods": {
+        "close": "self",
+        "create_payment": "self, *, amount_rubles: float, order_id: str, product_name: str, product_type: str='services', description: str='', customer_email: str | None=None, customer_phone: str | None=None, prefer_methods: list[str] | None=None, success_url: str | None=None, fail_url: str | None=None, merchant_extra: str | None=None",
+        "check_payment": "self, *, order_id: str",
+        "verify_callback_signature": "self, raw_body: bytes, received_signature: str"
+      }
+    },
+    "aurapay": {
+      "module": "aurapay",
+      "class": "AuraPayService",
+      "methods": {
+        "close": "self",
+        "create_invoice": "self, *, amount: float, order_id: str, comment: str='', service: str | None=None, success_url: str | None=None, fail_url: str | None=None, callback_url: str | None=None, custom_fields: str | None=None, lifetime: int | None=None",
+        "get_invoice_status": "self, *, order_id: str | None=None, invoice_id: str | None=None",
+        "verify_webhook_signature": "self, payload: dict[str, Any], received_signature: str"
+      }
+    },
+    "cashera": {
+      "module": "cashera",
+      "class": "CasheraService",
+      "methods": {
+        "close": "self",
+        "create_transaction": "self, *, amount_kopeks: int, external_id: str, description: str, payment_method: str | None, callback_url: str | None=None, success_url: str | None=None, fail_url: str | None=None, metadata: dict[str, Any] | None=None",
+        "get_transaction": "self, transaction_uuid: str",
+        "get_transaction_by_external_id": "self, external_id: str",
+        "get_h2h": "self, transaction_uuid: str",
+        "create_subscription": "self, *, amount_kopeks: int, external_id: str, interval: str, description: str, callback_url: str | None=None",
+        "get_subscription": "self, subscription_uuid: str",
+        "get_subscription_by_external_id": "self, external_id: str",
+        "list_subscription_charges": "self, subscription_uuid: str, *, page: int=1, per_page: int=100",
+        "cancel_subscription": "self, subscription_uuid: str",
+        "verify_webhook": "self, api_key_header: str | None, secret_header: str | None"
+      }
+    },
+    "cispay": {
+      "module": "cispay",
+      "class": "CisPayService",
+      "methods": {
+        "snapshot": "",
+        "close": "self",
+        "create_payment": "self, *, amount_kopeks: int, order_id: str, payment_method: str | None=None, customer_id: str | None=None, description: str | None=None, redirect_success_url: str | None=None, redirect_fail_url: str | None=None, payload: str | None=None, config: CisPayConfig | None=None",
+        "create_subscription": "self, *, amount_kopeks: int, interval_days: int, customer_id: str, purpose: str, success_url: str | None=None, fail_url: str | None=None, config: CisPayConfig | None=None",
+        "get_subscription": "self, subscription_id: str, *, config: CisPayConfig | None=None",
+        "cancel_subscription": "self, subscription_id: str, *, config: CisPayConfig | None=None",
+        "update_subscription": "self, subscription_id: str, *, interval_days: int | None=None, purpose: str | None=None, config: CisPayConfig | None=None",
+        "list_subscriptions": "self, *, limit=20, offset=0, status=None, config: CisPayConfig | None=None",
+        "list_transactions": "self, *, limit=20, offset=0, status=None, config: CisPayConfig | None=None",
+        "check_payment": "self, *, payment_id: str | None=None, order_id: str | None=None, config: CisPayConfig | None=None",
+        "get_store_capabilities": "self, *, config: CisPayConfig | None=None",
+        "get_balance": "self, *, config: CisPayConfig | None=None",
+        "verify_webhook_signature": "self, raw_body: bytes, signature: str | None, *, config: CisPayConfig | None=None"
+      }
+    },
+    "cloudpayments": {
+      "module": "cloudpayments",
+      "class": "CloudPaymentsService",
+      "methods": {
+        "generate_payment_link": "self, telegram_id: int | None, user_id: int, amount_kopeks: int, invoice_id: str, description: str | None=None, email: str | None=None, success_redirect_url: str | None=None, fail_redirect_url: str | None=None",
+        "generate_invoice_id": "self, user_id: int",
+        "charge_by_token": "self, token: str, amount_kopeks: int, account_id: str, invoice_id: str, description: str | None=None",
+        "get_payment": "self, transaction_id: int",
+        "find_payment": "self, invoice_id: str",
+        "refund_payment": "self, transaction_id: int, amount_kopeks: int | None=None",
+        "void_payment": "self, transaction_id: int",
+        "verify_webhook_signature": "body: bytes, signature: str, api_secret: str",
+        "parse_webhook_data": "form_data: dict[str, Any]"
+      }
+    },
+    "donut": {
+      "module": "donut",
+      "class": "DonutService",
+      "methods": {
+        "close": "self",
+        "create_payment": "self, *, amount_rubles: float, order_id: str, customer_id: str, method_description: str, customer_email: str | None=None, customer_phone: str | None=None, callback_url: str | None=None, return_url: str | None=None, receipt: str | None=None, redirect: bool=True",
+        "check_payment": "self, *, transaction_id: str",
+        "get_balance": "self",
+        "verify_callback_signature": "self, payload: dict[str, Any]"
+      }
+    },
+    "etoplatezhi": {
+      "module": "etoplatezhi",
+      "class": "EtoplatezhiService",
+      "methods": {
+        "build_payment_url": "self, *, project_id: int, payment_id: str, payment_amount: int, payment_currency: str='RUB', customer_id: str, description: str | None=None, callback_url: str | None=None, success_url: str | None=None, fail_url: str | None=None, force_payment_method: str | None=None, customer_email: str | None=None, language_code: str | None=None",
+        "verify_callback_signature": "self, payload: dict[str, Any]"
+      }
+    },
+    "freekassa": {
+      "module": "freekassa",
+      "class": "FreekassaService",
+      "methods": {
+        "generate_form_signature": "self, amount: float, currency: str, order_id: str",
+        "verify_webhook_signature": "self, shop_id: int, amount: float, order_id: str, sign: str",
+        "verify_webhook_ip": "self, ip: str",
+        "build_payment_url": "self, order_id: str, amount: float, currency: str='RUB', email: str | None=None, phone: str | None=None, payment_system_id: int | None=None, lang: str='ru', ip: str | None=None",
+        "create_order": "self, order_id: str, amount: float, currency: str='RUB', email: str | None=None, ip: str | None=None, payment_system_id: int | None=None, success_url: str | None=None, failure_url: str | None=None, notification_url: str | None=None",
+        "create_order_and_get_url": "self, order_id: str, amount: float, currency: str='RUB', email: str | None=None, ip: str | None=None, payment_system_id: int | None=None",
+        "get_order_status": "self, order_id: str",
+        "get_balance": "self",
+        "get_payment_systems": "self"
+      }
+    },
+    "jupiter": {
+      "module": "jupiter",
+      "class": "JupiterService",
+      "methods": {
+        "close": "self",
+        "create_payment": "self, *, amount_rubles: float, order_id: str, customer_id: str, customer_email: str | None=None, customer_phone: str | None=None, customer_name: str | None=None, callback_url: str | None=None, receipt: str | None=None, description: str | None=None",
+        "check_payment": "self, *, transaction_id: str",
+        "get_balance": "self",
+        "verify_callback_signature": "self, payload: dict[str, Any]"
+      }
+    },
+    "kassa_ai": {
+      "module": "kassa_ai",
+      "class": "KassaAiService",
+      "methods": {
+        "verify_webhook_signature": "self, shop_id: int, amount: float, order_id: str, sign: str",
+        "create_order": "self, order_id: str, amount: float, currency: str='RUB', email: str | None=None, ip: str | None=None, payment_system_id: int | None=None, success_url: str | None=None, fail_url: str | None=None, notification_url: str | None=None",
+        "create_order_and_get_url": "self, order_id: str, amount: float, currency: str='RUB', email: str | None=None, ip: str | None=None, payment_system_id: int | None=None, success_url: str | None=None, fail_url: str | None=None, notification_url: str | None=None",
+        "get_order_status": "self, order_id: str",
+        "get_balance": "self"
+      }
+    },
+    "lava": {
+      "module": "lava",
+      "class": "LavaService",
+      "methods": {
+        "close": "self",
+        "create_invoice": "self, *, amount_rubles: float, order_id: str, success_url: str | None=None, fail_url: str | None=None, hook_url: str | None=None, expire_minutes: int | None=None, comment: str | None=None, custom_fields: str | None=None, include_service: list[str] | None=None, exclude_service: list[str] | None=None",
+        "get_invoice_status": "self, *, order_id: str | None=None, invoice_id: str | None=None",
+        "get_services": "self",
+        "list_recurrent_products": "self",
+        "create_recurrent_consumer": "self, *, consumer_id: str, email: str, phone: str | None=None",
+        "subscribe_recurrent": "self, *, product_id: str, consumer_id: str, order_id: str",
+        "unsubscribe_recurrent": "self, *, subscription_id: str | None=None, order_id: str | None=None",
+        "get_recurrent_subscription_status": "self, *, subscription_id: str | None=None, order_id: str | None=None",
+        "offset_recurrent_next_pay_time": "self, *, days: int, subscription_id: str | None=None, order_id: str | None=None",
+        "verify_webhook_signature": "self, raw_body: bytes, received_signature: str"
+      }
+    },
+    "mulenpay": {
+      "module": "mulenpay",
+      "class": "MulenPayService",
+      "methods": {
+        "create_payment": "self, *, amount_kopeks: int, description: str, uuid: str, items: list, language: str='ru', subscribe: str | None=None, hold_time: int | None=None, website_url: str | None=None, client: str | None=None",
+        "get_payment": "self, payment_id: int",
+        "list_payments": "self, *, offset: int=0, limit: int=100, uuid: str | None=None, status: int | None=None"
+      }
+    },
+    "overpay": {
+      "module": "overpay",
+      "class": "OverpayService",
+      "methods": {
+        "close": "self",
+        "create_payment": "self, *, amount: str, currency: str='RUB', lifetime_minutes: int=1440, merchant_transaction_id: str, description: str='', return_url: str | None=None, payment_methods: list[str] | None=None, project_id: str | None=None",
+        "create_payment_s2s": "self, *, amount: str, currency: str='RUB', project_id: str, merchant_transaction_id: str, client_email: str | None=None, return_url: str, payment_method: str='fps'",
+        "wait_for_redirect_link": "self, order_id: str, *, attempts: int=4, delay: float=0.3",
+        "get_payment": "self, order_id: str",
+        "refund_payment": "self, order_id: str, amount: str"
+      }
+    },
+    "pal24": {
+      "module": "pal24",
+      "class": "Pal24Service",
+      "methods": {
+        "create_bill": "self, *, amount_kopeks: int, user_id: int, order_id: str, description: str, ttl_seconds: int | None=None, custom_payload: dict[str, Any] | None=None, payer_email: str | None=None, payment_method: str | None=None",
+        "get_bill_status": "self, bill_id: str",
+        "get_payment_status": "self, payment_id: str",
+        "get_bill_payments": "self, bill_id: str",
+        "parse_callback": "payload: dict[str, Any]",
+        "convert_to_kopeks": "amount: str",
+        "get_expiration": "ttl_seconds: int | None"
+      }
+    },
+    "paritypay": {
+      "module": "paritypay",
+      "class": "ParityPayService",
+      "methods": {
+        "close": "self",
+        "create_invoice": "self, *, order_id: str, amount_kopeks: int, comment: str | None=None, custom_fields: str | None=None, service: str | None=None, expire_minutes: int | None=None, success_url: str | None=None, fail_url: str | None=None, callback_url: str | None=None",
+        "get_invoice": "self, *, invoice_id: str | None=None, order_id: str | None=None",
+        "create_invoice_reconciled": "self, *, order_id: str, **kwargs: Any",
+        "parse_callback_body": "raw_body: bytes",
+        "build_signature_payload": "cls, body: dict[str, Any]",
+        "verify_callback_signature": "self, body: dict[str, Any], signature: str | None"
+      }
+    },
+    "platega": {
+      "module": "platega",
+      "class": "PlategaService",
+      "methods": {
+        "create_payment": "self, *, payer: PayerIdentity, payment_method: int, amount: float, currency: str, description: str | None=None, return_url: str | None=None, failed_url: str | None=None, payload: str | None=None",
+        "get_transaction": "self, transaction_id: str",
+        "create_subscription": "self, *, payer: PayerIdentity, amount: float, currency: str, interval: int, description: str | None=None",
+        "get_subscription": "self, subscription_id: str",
+        "get_subscription_status": "self, subscription_id: str",
+        "list_subscriptions": "self, *, status: str | None=None, date_from: str | None=None, date_to: str | None=None, page: int | None=None, size: int | None=None",
+        "cancel_subscription": "self, subscription_id: str",
+        "parse_redirect_url": "response: dict[str, Any] | None",
+        "parse_expires_at": "expires_in: str | None"
+      }
+    },
+    "riopay": {
+      "module": "riopay",
+      "class": "RioPayService",
+      "methods": {
+        "close": "self",
+        "create_order": "self, *, amount: float, external_id: str, purpose: str='Пополнение баланса', success_url: str | None=None",
+        "get_order": "self, order_id: str",
+        "verify_webhook_signature": "self, raw_body: bytes, signature: str"
+      }
+    },
+    "rollypay": {
+      "module": "rollypay",
+      "class": "RollyPayService",
+      "methods": {
+        "close": "self",
+        "create_payment": "self, *, amount_value: str, currency: str='RUB', order_id: str, payment_method: str | None=None, description: str='', redirect_url: str | None=None, success_redirect_url: str | None=None, fail_redirect_url: str | None=None, customer_id: str | None=None, metadata: dict[str, Any] | None=None",
+        "get_payment": "self, payment_id: str",
+        "verify_webhook_signature": "self, raw_body: bytes, received_signature: str, timestamp: str"
+      }
+    },
+    "severpay": {
+      "module": "severpay",
+      "class": "SeverPayService",
+      "methods": {
+        "close": "self",
+        "create_payment": "self, *, order_id: str, amount: float, currency: str='RUB', client_email: str='', client_id: str='', url_return: str | None=None, lifetime: int | None=None",
+        "get_payment": "self, payment_id: str",
+        "verify_webhook_signature": "self, raw_body: bytes"
+      }
+    },
+    "tabpay": {
+      "module": "tabpay",
+      "class": "TabPayService",
+      "methods": {
+        "close": "self",
+        "create_payment": "self, *, order_id: str, amount_kopecks: int, description: str | None=None, email: str | None=None, telegram_id: int | str | None=None, metadata: dict[str, Any] | None=None, success_url: str | None=None, fail_url: str | None=None, method: str | None=None",
+        "get_payment": "self, payment_id: str",
+        "get_payment_by_order_id": "self, order_id: str",
+        "create_payment_reconciled": "self, *, order_id: str, **kwargs: Any",
+        "verify_webhook_signature": "self, raw_body: bytes, timestamp: str | None, signature_v2: str | None, *, max_age_seconds: int | None=None"
+      }
+    },
+    "wata": {
+      "module": "wata",
+      "class": "WataService",
+      "methods": {
+        "create_payment_link": "self, *, amount_kopeks: int, currency: str, description: str, order_id: str, success_url: str | None=None, fail_url: str | None=None, link_type: str | None=None, expiration_minutes: int | None=None, allow_arbitrary_amount: bool=False, arbitrary_amount_prompts: list[int] | None=None",
+        "get_payment_link": "self, payment_link_id: str",
+        "search_transactions": "self, *, order_id: str | None=None, payment_link_id: str | None=None, status: str | None=None, limit: int=5",
+        "get_transaction": "self, transaction_id: str"
+      }
+    },
+    "yookassa": {
+      "module": "yookassa",
+      "class": "YooKassaService",
+      "methods": {
+        "create_payment": "self, amount: float, currency: str, description: str, metadata: dict[str, Any], receipt_email: str | None=None, receipt_phone: str | None=None, return_url: str | None=None",
+        "create_sbp_payment": "self, amount: float, currency: str, description: str, metadata: dict[str, Any], receipt_email: str | None=None, receipt_phone: str | None=None, return_url: str | None=None",
+        "get_payment_info": "self, payment_id_in_yookassa: str",
+        "create_autopayment": "self, amount: float, currency: str, description: str, payment_method_id: str, metadata: dict[str, Any], receipt_email: str | None=None, receipt_phone: str | None=None, idempotence_key: str | None=None"
+      }
+    },
+    "cryptobot": {
+      "module": "cryptobot",
+      "class": "CryptoBotService",
+      "methods": {
+        "get_me": "self",
+        "create_invoice": "self, amount: str, asset: str='USDT', description: str | None=None, payload: str | None=None, expires_in: int | None=None",
+        "get_invoices": "self, asset: str | None=None, status: str | None=None, offset: int=0, count: int=100, invoice_ids: list | None=None",
+        "get_balance": "self",
+        "get_exchange_rates": "self",
+        "verify_webhook_signature": "self, body: str, signature: str",
+        "process_webhook": "self, webhook_data: dict[str, Any]"
+      }
+    },
+    "heleket": {
+      "module": "heleket",
+      "class": "HeleketService",
+      "methods": {
+        "create_payment": "self, payload: dict[str, Any]",
+        "get_payment_info": "self, *, uuid: str | None=None, order_id: str | None=None",
+        "list_payments": "self, *, date_from: str | None=None, date_to: str | None=None, cursor: str | None=None",
+        "verify_webhook_signature": "self, payload: dict[str, Any]"
+      }
+    },
+    "tribute": {
+      "module": "tribute",
+      "class": "TributeService",
+      "methods": {
+        "create_payment_link": "self, user_id: int, amount_kopeks: int=0, description: str='Пополнение баланса'",
+        "verify_webhook_signature": "self, payload: str, signature: str",
+        "process_webhook": "self, payload_or_data",
+        "get_payment_status": "self, payment_id: str",
+        "refund_payment": "self, payment_id: str, amount_kopeks: int | None=None, reason: str='Возврат по запросу'"
+      }
+    },
+    "apple_iap": {
+      "module": "apple_iap",
+      "class": "AppleIAPService",
+      "methods": {
+        "verify_transaction": "self, transaction_id: str, environment: str | None=None, *, allow_environment_fallback: bool=True",
+        "verify_signed_transaction_info": "self, signed_transaction_info: str, environment: str | None=None",
+        "verify_notification": "self, signed_payload: str, environment: str | None=None",
+        "validate_transaction_info": "self, txn_info: dict[str, Any], expected_product_id: str"
+      }
+    },
+    "telegram_stars": {
+      "module": null,
+      "class": "TelegramStarsGateway",
+      "methods": {}
+    }
+  },
+  "fields": {
+    "TELEGRAM_STARS_ENABLED": {
+      "default": true,
+      "type": "bool",
+      "secret": false
+    },
+    "TELEGRAM_STARS_RATE_RUB": {
+      "default": 1.0,
+      "type": "float",
+      "secret": false
+    },
+    "TELEGRAM_STARS_DISPLAY_NAME": {
+      "default": "Telegram Stars",
+      "type": "str",
+      "secret": false
+    },
+    "TRIBUTE_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "TRIBUTE_API_KEY": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "TRIBUTE_DONATE_LINK": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "TRIBUTE_WEBHOOK_PATH": {
+      "default": "/tribute-webhook",
+      "type": "str",
+      "secret": false
+    },
+    "TRIBUTE_WEBHOOK_HOST": {
+      "default": "0.0.0.0",
+      "type": "str",
+      "secret": false
+    },
+    "TRIBUTE_WEBHOOK_PORT": {
+      "default": 8081,
+      "type": "int",
+      "secret": false
+    },
+    "YOOKASSA_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "YOOKASSA_DISPLAY_NAME": {
+      "default": "YooKassa",
+      "type": "str",
+      "secret": false
+    },
+    "YOOKASSA_HTTP_CONNECT_TIMEOUT": {
+      "default": 5,
+      "type": "int",
+      "secret": false
+    },
+    "YOOKASSA_HTTP_READ_TIMEOUT": {
+      "default": 10,
+      "type": "int",
+      "secret": false
+    },
+    "YOOKASSA_MAX_CONCURRENT_REQUESTS": {
+      "default": 4,
+      "type": "int",
+      "secret": false
+    },
+    "YOOKASSA_SHOP_ID": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "YOOKASSA_SECRET_KEY": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "YOOKASSA_RETURN_URL": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "YOOKASSA_DEFAULT_RECEIPT_EMAIL": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "YOOKASSA_VAT_CODE": {
+      "default": 1,
+      "type": "int",
+      "secret": false
+    },
+    "YOOKASSA_SBP_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "YOOKASSA_PAYMENT_MODE": {
+      "default": "full_payment",
+      "type": "str",
+      "secret": false
+    },
+    "YOOKASSA_PAYMENT_SUBJECT": {
+      "default": "service",
+      "type": "str",
+      "secret": false
+    },
+    "YOOKASSA_WEBHOOK_PATH": {
+      "default": "/yookassa-webhook",
+      "type": "str",
+      "secret": false
+    },
+    "YOOKASSA_WEBHOOK_HOST": {
+      "default": "0.0.0.0",
+      "type": "str",
+      "secret": false
+    },
+    "YOOKASSA_WEBHOOK_PORT": {
+      "default": 8082,
+      "type": "int",
+      "secret": false
+    },
+    "YOOKASSA_TRUSTED_PROXY_NETWORKS": {
+      "default": "",
+      "type": "str",
+      "secret": false
+    },
+    "YOOKASSA_SKIP_IP_CHECK": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "YOOKASSA_MIN_AMOUNT_KOPEKS": {
+      "default": 5000,
+      "type": "int",
+      "secret": false
+    },
+    "YOOKASSA_MAX_AMOUNT_KOPEKS": {
+      "default": 1000000,
+      "type": "int",
+      "secret": false
+    },
+    "YOOKASSA_RECURRENT_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "YOOKASSA_RECURRENT_REQUIRED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "YOOKASSA_TEST_MODE": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "CRYPTOBOT_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "CRYPTOBOT_DISPLAY_NAME": {
+      "default": "CryptoBot",
+      "type": "str",
+      "secret": false
+    },
+    "CRYPTOBOT_API_TOKEN": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "CRYPTOBOT_WEBHOOK_SECRET": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "CRYPTOBOT_BASE_URL": {
+      "default": "https://pay.crypt.bot",
+      "type": "str",
+      "secret": false
+    },
+    "CRYPTOBOT_TESTNET": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "CRYPTOBOT_WEBHOOK_PATH": {
+      "default": "/cryptobot-webhook",
+      "type": "str",
+      "secret": false
+    },
+    "CRYPTOBOT_WEBHOOK_PORT": {
+      "default": 8083,
+      "type": "int",
+      "secret": false
+    },
+    "CRYPTOBOT_DEFAULT_ASSET": {
+      "default": "USDT",
+      "type": "str",
+      "secret": false
+    },
+    "CRYPTOBOT_ASSETS": {
+      "default": "USDT,TON,BTC,ETH",
+      "type": "str",
+      "secret": false
+    },
+    "CRYPTOBOT_INVOICE_EXPIRES_HOURS": {
+      "default": 24,
+      "type": "int",
+      "secret": false
+    },
+    "HELEKET_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "HELEKET_DISPLAY_NAME": {
+      "default": "Heleket Crypto",
+      "type": "str",
+      "secret": false
+    },
+    "HELEKET_MERCHANT_ID": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "HELEKET_API_KEY": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "HELEKET_BASE_URL": {
+      "default": "https://api.heleket.com/v1",
+      "type": "str",
+      "secret": false
+    },
+    "HELEKET_DEFAULT_CURRENCY": {
+      "default": "USDT",
+      "type": "str",
+      "secret": false
+    },
+    "HELEKET_DEFAULT_NETWORK": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "HELEKET_INVOICE_LIFETIME": {
+      "default": 3600,
+      "type": "int",
+      "secret": false
+    },
+    "HELEKET_MARKUP_PERCENT": {
+      "default": 0.0,
+      "type": "float",
+      "secret": false
+    },
+    "HELEKET_WEBHOOK_PATH": {
+      "default": "/heleket-webhook",
+      "type": "str",
+      "secret": false
+    },
+    "HELEKET_WEBHOOK_HOST": {
+      "default": "0.0.0.0",
+      "type": "str",
+      "secret": false
+    },
+    "HELEKET_WEBHOOK_PORT": {
+      "default": 8086,
+      "type": "int",
+      "secret": false
+    },
+    "HELEKET_CALLBACK_URL": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "HELEKET_RETURN_URL": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "HELEKET_SUCCESS_URL": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "MULENPAY_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "MULENPAY_API_KEY": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "MULENPAY_SECRET_KEY": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "MULENPAY_SHOP_ID": {
+      "default": null,
+      "type": "int",
+      "secret": false
+    },
+    "MULENPAY_BASE_URL": {
+      "default": "https://mulenpay.ru/api",
+      "type": "str",
+      "secret": false
+    },
+    "MULENPAY_WEBHOOK_PATH": {
+      "default": "/mulenpay-webhook",
+      "type": "str",
+      "secret": false
+    },
+    "MULENPAY_DISPLAY_NAME": {
+      "default": "Mulen Pay",
+      "type": "str",
+      "secret": false
+    },
+    "MULENPAY_DESCRIPTION": {
+      "default": "Пополнение баланса",
+      "type": "str",
+      "secret": false
+    },
+    "MULENPAY_LANGUAGE": {
+      "default": "ru",
+      "type": "str",
+      "secret": false
+    },
+    "MULENPAY_VAT_CODE": {
+      "default": 0,
+      "type": "int",
+      "secret": false
+    },
+    "MULENPAY_PAYMENT_SUBJECT": {
+      "default": 4,
+      "type": "int",
+      "secret": false
+    },
+    "MULENPAY_PAYMENT_MODE": {
+      "default": 4,
+      "type": "int",
+      "secret": false
+    },
+    "MULENPAY_MIN_AMOUNT_KOPEKS": {
+      "default": 10000,
+      "type": "int",
+      "secret": false
+    },
+    "MULENPAY_MAX_AMOUNT_KOPEKS": {
+      "default": 10000000,
+      "type": "int",
+      "secret": false
+    },
+    "MULENPAY_IFRAME_EXPECTED_ORIGIN": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "MULENPAY_WEBSITE_URL": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "PAL24_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "PAL24_DISPLAY_NAME": {
+      "default": "PAL24",
+      "type": "str",
+      "secret": false
+    },
+    "PAL24_API_TOKEN": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "PAL24_SHOP_ID": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "PAL24_SIGNATURE_TOKEN": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "PAL24_BASE_URL": {
+      "default": "https://pal24.pro/api/v1/",
+      "type": "str",
+      "secret": false
+    },
+    "PAL24_WEBHOOK_PATH": {
+      "default": "/pal24-webhook",
+      "type": "str",
+      "secret": false
+    },
+    "PAL24_PAYMENT_DESCRIPTION": {
+      "default": "Пополнение баланса",
+      "type": "str",
+      "secret": false
+    },
+    "PAL24_MIN_AMOUNT_KOPEKS": {
+      "default": 10000,
+      "type": "int",
+      "secret": false
+    },
+    "PAL24_MAX_AMOUNT_KOPEKS": {
+      "default": 100000000,
+      "type": "int",
+      "secret": false
+    },
+    "PAL24_REQUEST_TIMEOUT": {
+      "default": 30,
+      "type": "int",
+      "secret": false
+    },
+    "PAL24_SBP_BUTTON_TEXT": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "PAL24_CARD_BUTTON_TEXT": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "PAL24_SBP_BUTTON_VISIBLE": {
+      "default": true,
+      "type": "bool",
+      "secret": false
+    },
+    "PAL24_CARD_BUTTON_VISIBLE": {
+      "default": true,
+      "type": "bool",
+      "secret": false
+    },
+    "PLATEGA_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "PLATEGA_MERCHANT_ID": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "PLATEGA_SECRET": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "PLATEGA_DISPLAY_NAME": {
+      "default": "Platega",
+      "type": "str",
+      "secret": false
+    },
+    "PLATEGA_BASE_URL": {
+      "default": "https://app.platega.io",
+      "type": "str",
+      "secret": false
+    },
+    "PLATEGA_API_VERSION": {
+      "default": "v1",
+      "type": "str",
+      "secret": false
+    },
+    "PLATEGA_RETURN_URL": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "PLATEGA_FAILED_URL": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "PLATEGA_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "PLATEGA_ACTIVE_METHODS": {
+      "default": "2,11,12,13",
+      "type": "str",
+      "secret": false
+    },
+    "PLATEGA_INLINE_METHODS": {
+      "default": true,
+      "type": "bool",
+      "secret": false
+    },
+    "PLATEGA_MIN_AMOUNT_KOPEKS": {
+      "default": 10000,
+      "type": "int",
+      "secret": false
+    },
+    "PLATEGA_MAX_AMOUNT_KOPEKS": {
+      "default": 100000000,
+      "type": "int",
+      "secret": false
+    },
+    "PLATEGA_WEBHOOK_PATH": {
+      "default": "/platega-webhook",
+      "type": "str",
+      "secret": false
+    },
+    "PLATEGA_WEBHOOK_HOST": {
+      "default": "0.0.0.0",
+      "type": "str",
+      "secret": false
+    },
+    "PLATEGA_WEBHOOK_PORT": {
+      "default": 8086,
+      "type": "int",
+      "secret": false
+    },
+    "PLATEGA_RECURRENT_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "ANORE_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "ANORE_DISPLAY_NAME": {
+      "default": "Anore",
+      "type": "str",
+      "secret": false
+    },
+    "ANORE_API_URL": {
+      "default": "https://api.anore.cc/v1",
+      "type": "str",
+      "secret": false
+    },
+    "ANORE_API_KEY": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "ANORE_SECRET_KEY": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "ANORE_SHOP_ID": {
+      "default": null,
+      "type": "int",
+      "secret": false
+    },
+    "ANORE_PAYMENT_METHODS": {
+      "default": "sbp,card,yoomoney,crypto",
+      "type": "str",
+      "secret": false
+    },
+    "ANORE_MIN_AMOUNT_KOPEKS": {
+      "default": 10000,
+      "type": "int",
+      "secret": false
+    },
+    "ANORE_MAX_AMOUNT_KOPEKS": {
+      "default": 100000000,
+      "type": "int",
+      "secret": false
+    },
+    "ANORE_REQUEST_TIMEOUT": {
+      "default": 30,
+      "type": "int",
+      "secret": false
+    },
+    "ANORE_WEBHOOK_PATH": {
+      "default": "/anore-webhook",
+      "type": "str",
+      "secret": false
+    },
+    "ANORE_SUCCESS_URL": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "ANORE_FAIL_URL": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "WATA_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "WATA_DISPLAY_NAME": {
+      "default": "Wata",
+      "type": "str",
+      "secret": false
+    },
+    "WATA_BASE_URL": {
+      "default": "https://api.wata.pro/api/h2h",
+      "type": "str",
+      "secret": false
+    },
+    "WATA_ACCESS_TOKEN": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "WATA_TERMINAL_PUBLIC_ID": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "WATA_PAYMENT_DESCRIPTION": {
+      "default": "Пополнение баланса",
+      "type": "str",
+      "secret": false
+    },
+    "WATA_PAYMENT_TYPE": {
+      "default": "OneTime",
+      "type": "str",
+      "secret": false
+    },
+    "WATA_SUCCESS_REDIRECT_URL": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "WATA_FAIL_REDIRECT_URL": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "WATA_LINK_TTL_MINUTES": {
+      "default": null,
+      "type": "int",
+      "secret": false
+    },
+    "WATA_MIN_AMOUNT_KOPEKS": {
+      "default": 10000,
+      "type": "int",
+      "secret": false
+    },
+    "WATA_MAX_AMOUNT_KOPEKS": {
+      "default": 100000000,
+      "type": "int",
+      "secret": false
+    },
+    "WATA_REQUEST_TIMEOUT": {
+      "default": 30,
+      "type": "int",
+      "secret": false
+    },
+    "WATA_WEBHOOK_PATH": {
+      "default": "/wata-webhook",
+      "type": "str",
+      "secret": false
+    },
+    "WATA_WEBHOOK_HOST": {
+      "default": "0.0.0.0",
+      "type": "str",
+      "secret": false
+    },
+    "WATA_WEBHOOK_PORT": {
+      "default": 8085,
+      "type": "int",
+      "secret": false
+    },
+    "WATA_PUBLIC_KEY_URL": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "WATA_PUBLIC_KEY_CACHE_SECONDS": {
+      "default": 3600,
+      "type": "int",
+      "secret": false
+    },
+    "CLOUDPAYMENTS_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "CLOUDPAYMENTS_DISPLAY_NAME": {
+      "default": "CloudPayments",
+      "type": "str",
+      "secret": false
+    },
+    "CLOUDPAYMENTS_PUBLIC_ID": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "CLOUDPAYMENTS_API_SECRET": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "CLOUDPAYMENTS_API_URL": {
+      "default": "https://api.cloudpayments.ru",
+      "type": "str",
+      "secret": false
+    },
+    "CLOUDPAYMENTS_WIDGET_URL": {
+      "default": "https://widget.cloudpayments.ru/show",
+      "type": "str",
+      "secret": false
+    },
+    "CLOUDPAYMENTS_DESCRIPTION": {
+      "default": "Пополнение баланса",
+      "type": "str",
+      "secret": false
+    },
+    "CLOUDPAYMENTS_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "CLOUDPAYMENTS_MIN_AMOUNT_KOPEKS": {
+      "default": 5000,
+      "type": "int",
+      "secret": false
+    },
+    "CLOUDPAYMENTS_MAX_AMOUNT_KOPEKS": {
+      "default": 10000000,
+      "type": "int",
+      "secret": false
+    },
+    "CLOUDPAYMENTS_WEBHOOK_PATH": {
+      "default": "/cloudpayments-webhook",
+      "type": "str",
+      "secret": false
+    },
+    "CLOUDPAYMENTS_WEBHOOK_HOST": {
+      "default": "0.0.0.0",
+      "type": "str",
+      "secret": false
+    },
+    "CLOUDPAYMENTS_WEBHOOK_PORT": {
+      "default": 8087,
+      "type": "int",
+      "secret": false
+    },
+    "CLOUDPAYMENTS_RETURN_URL": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "CLOUDPAYMENTS_SKIN": {
+      "default": "mini",
+      "type": "str",
+      "secret": false
+    },
+    "CLOUDPAYMENTS_REQUIRE_EMAIL": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "CLOUDPAYMENTS_TEST_MODE": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "FREEKASSA_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "FREEKASSA_SHOP_ID": {
+      "default": null,
+      "type": "int",
+      "secret": false
+    },
+    "FREEKASSA_API_KEY": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "FREEKASSA_SECRET_WORD_1": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "FREEKASSA_SECRET_WORD_2": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "FREEKASSA_DISPLAY_NAME": {
+      "default": "Freekassa",
+      "type": "str",
+      "secret": false
+    },
+    "FREEKASSA_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "FREEKASSA_MIN_AMOUNT_KOPEKS": {
+      "default": 10000,
+      "type": "int",
+      "secret": false
+    },
+    "FREEKASSA_MAX_AMOUNT_KOPEKS": {
+      "default": 100000000,
+      "type": "int",
+      "secret": false
+    },
+    "FREEKASSA_PAYMENT_TIMEOUT_SECONDS": {
+      "default": 3600,
+      "type": "int",
+      "secret": false
+    },
+    "FREEKASSA_WEBHOOK_PATH": {
+      "default": "/freekassa-webhook",
+      "type": "str",
+      "secret": false
+    },
+    "FREEKASSA_WEBHOOK_HOST": {
+      "default": "0.0.0.0",
+      "type": "str",
+      "secret": false
+    },
+    "FREEKASSA_WEBHOOK_PORT": {
+      "default": 8088,
+      "type": "int",
+      "secret": false
+    },
+    "FREEKASSA_PAYMENT_SYSTEM_ID": {
+      "default": null,
+      "type": "int",
+      "secret": false
+    },
+    "FREEKASSA_USE_API": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "FREEKASSA_SBP_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "FREEKASSA_SBP_DISPLAY_NAME": {
+      "default": "СБП (QR код)",
+      "type": "str",
+      "secret": false
+    },
+    "FREEKASSA_CARD_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "FREEKASSA_CARD_DISPLAY_NAME": {
+      "default": "Карта РФ",
+      "type": "str",
+      "secret": false
+    },
+    "KASSA_AI_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "KASSA_AI_SHOP_ID": {
+      "default": null,
+      "type": "int",
+      "secret": false
+    },
+    "KASSA_AI_API_KEY": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "KASSA_AI_SECRET_WORD_2": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "KASSA_AI_DISPLAY_NAME": {
+      "default": "KassaAI",
+      "type": "str",
+      "secret": false
+    },
+    "KASSA_AI_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "KASSA_AI_MIN_AMOUNT_KOPEKS": {
+      "default": 10000,
+      "type": "int",
+      "secret": false
+    },
+    "KASSA_AI_MAX_AMOUNT_KOPEKS": {
+      "default": 100000000,
+      "type": "int",
+      "secret": false
+    },
+    "KASSA_AI_WEBHOOK_PATH": {
+      "default": "/kassa-ai-webhook",
+      "type": "str",
+      "secret": false
+    },
+    "KASSA_AI_WEBHOOK_HOST": {
+      "default": "0.0.0.0",
+      "type": "str",
+      "secret": false
+    },
+    "KASSA_AI_WEBHOOK_PORT": {
+      "default": 8089,
+      "type": "int",
+      "secret": false
+    },
+    "KASSA_AI_PAYMENT_SYSTEM_ID": {
+      "default": 44,
+      "type": "int",
+      "secret": false
+    },
+    "KASSA_AI_SBP_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "KASSA_AI_SBP_DISPLAY_NAME": {
+      "default": "СБП (KassaAI)",
+      "type": "str",
+      "secret": false
+    },
+    "KASSA_AI_CARD_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "KASSA_AI_CARD_DISPLAY_NAME": {
+      "default": "Карта (KassaAI)",
+      "type": "str",
+      "secret": false
+    },
+    "KASSA_AI_SBERPAY_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "KASSA_AI_SBERPAY_DISPLAY_NAME": {
+      "default": "SberPay (KassaAI)",
+      "type": "str",
+      "secret": false
+    },
+    "RIOPAY_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "RIOPAY_API_TOKEN": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "RIOPAY_WEBHOOK_SECRET": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "RIOPAY_DISPLAY_NAME": {
+      "default": "RioPay",
+      "type": "str",
+      "secret": false
+    },
+    "RIOPAY_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "RIOPAY_MIN_AMOUNT_KOPEKS": {
+      "default": 10000,
+      "type": "int",
+      "secret": false
+    },
+    "RIOPAY_MAX_AMOUNT_KOPEKS": {
+      "default": 100000000,
+      "type": "int",
+      "secret": false
+    },
+    "RIOPAY_WEBHOOK_PATH": {
+      "default": "/riopay-webhook",
+      "type": "str",
+      "secret": false
+    },
+    "RIOPAY_SUCCESS_URL": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "RIOPAY_FAIL_URL": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "SEVERPAY_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "SEVERPAY_MID": {
+      "default": null,
+      "type": "int",
+      "secret": false
+    },
+    "SEVERPAY_TOKEN": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "SEVERPAY_DISPLAY_NAME": {
+      "default": "SeverPay",
+      "type": "str",
+      "secret": false
+    },
+    "SEVERPAY_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "SEVERPAY_MIN_AMOUNT_KOPEKS": {
+      "default": 10000,
+      "type": "int",
+      "secret": false
+    },
+    "SEVERPAY_MAX_AMOUNT_KOPEKS": {
+      "default": 10000000,
+      "type": "int",
+      "secret": false
+    },
+    "SEVERPAY_WEBHOOK_PATH": {
+      "default": "/severpay-webhook",
+      "type": "str",
+      "secret": false
+    },
+    "SEVERPAY_RETURN_URL": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "SEVERPAY_LIFETIME": {
+      "default": 1440,
+      "type": "int",
+      "secret": false
+    },
+    "APPLE_IAP_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "APPLE_IAP_KEY_ID": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "APPLE_IAP_ISSUER_ID": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "APPLE_IAP_BUNDLE_ID": {
+      "default": "com.app.client",
+      "type": "str",
+      "secret": false
+    },
+    "APPLE_IAP_APP_APPLE_ID": {
+      "default": null,
+      "type": "int",
+      "secret": false
+    },
+    "APPLE_IAP_PRIVATE_KEY": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "APPLE_IAP_PRIVATE_KEY_PATH": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "APPLE_IAP_ENVIRONMENT": {
+      "default": "Production",
+      "type": "str",
+      "secret": false
+    },
+    "APPLE_IAP_WEBHOOK_PATH": {
+      "default": "/apple-iap-webhook",
+      "type": "str",
+      "secret": false
+    },
+    "APPLE_IAP_ROOT_CERTS_PATHS": {
+      "default": "",
+      "type": "str",
+      "secret": false
+    },
+    "APPLE_IAP_ENABLE_ONLINE_CERT_CHECKS": {
+      "default": true,
+      "type": "bool",
+      "secret": false
+    },
+    "APPLE_IAP_ALLOW_SANDBOX_ON_PRODUCTION": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "APPLE_IAP_PURCHASE_RATE_LIMIT_PER_MINUTE": {
+      "default": 10,
+      "type": "int",
+      "secret": false
+    },
+    "APPLE_IAP_PURCHASE_FAILURE_LIMIT_PER_HOUR": {
+      "default": 20,
+      "type": "int",
+      "secret": false
+    },
+    "APPLE_IAP_RATE_LIMIT_FAIL_OPEN": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "APPLE_IAP_PRODUCTS": {
+      "default": "{\"com.app.client.topup.100\":10000,\"com.app.client.topup.300\":30000,\"com.app.client.topup.500\":50000}",
+      "type": "str",
+      "secret": false
+    },
+    "ROLLYPAY_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "ROLLYPAY_API_KEY": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "ROLLYPAY_SIGNING_SECRET": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "ROLLYPAY_DISPLAY_NAME": {
+      "default": "RollyPay",
+      "type": "str",
+      "secret": false
+    },
+    "ROLLYPAY_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "ROLLYPAY_MIN_AMOUNT_KOPEKS": {
+      "default": 10000,
+      "type": "int",
+      "secret": false
+    },
+    "ROLLYPAY_MAX_AMOUNT_KOPEKS": {
+      "default": 10000000,
+      "type": "int",
+      "secret": false
+    },
+    "ROLLYPAY_WEBHOOK_PATH": {
+      "default": "/rollypay-webhook",
+      "type": "str",
+      "secret": false
+    },
+    "ROLLYPAY_RETURN_URL": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "OVERPAY_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "OVERPAY_API_URL": {
+      "default": "https://api.overpay.io",
+      "type": "str",
+      "secret": false
+    },
+    "OVERPAY_USERNAME": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "OVERPAY_PASSWORD": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "OVERPAY_PROJECT_ID": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "OVERPAY_P12_PATH": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "OVERPAY_P12_PASSPHRASE": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "OVERPAY_DISPLAY_NAME": {
+      "default": "Overpay",
+      "type": "str",
+      "secret": false
+    },
+    "OVERPAY_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "OVERPAY_MIN_AMOUNT_KOPEKS": {
+      "default": 10000,
+      "type": "int",
+      "secret": false
+    },
+    "OVERPAY_MAX_AMOUNT_KOPEKS": {
+      "default": 10000000,
+      "type": "int",
+      "secret": false
+    },
+    "OVERPAY_WEBHOOK_PATH": {
+      "default": "/overpay-webhook",
+      "type": "str",
+      "secret": false
+    },
+    "OVERPAY_RETURN_URL": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "OVERPAY_LIFETIME_MINUTES": {
+      "default": 1440,
+      "type": "int",
+      "secret": false
+    },
+    "OVERPAY_PAYMENT_METHODS": {
+      "default": "card,fps",
+      "type": "str",
+      "secret": false
+    },
+    "OVERPAY_SBP_TERMINAL_ID": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "OVERPAY_CARD_TERMINAL_ID": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "OVERPAY_INT_TERMINAL_ID": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "OVERPAY_SBP_DIRECT_QR": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "OVERPAY_INT_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "OVERPAY_INT_MIN_EUR": {
+      "default": 5.0,
+      "type": "float",
+      "secret": false
+    },
+    "OVERPAY_RUB_PER_EUR": {
+      "default": 0.0,
+      "type": "float",
+      "secret": false
+    },
+    "OVERPAY_SERVER_IP": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "AURAPAY_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "AURAPAY_API_KEY": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "AURAPAY_SHOP_ID": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "AURAPAY_SECRET_KEY": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "AURAPAY_DISPLAY_NAME": {
+      "default": "AuraPay",
+      "type": "str",
+      "secret": false
+    },
+    "AURAPAY_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "AURAPAY_MIN_AMOUNT_KOPEKS": {
+      "default": 10000,
+      "type": "int",
+      "secret": false
+    },
+    "AURAPAY_MAX_AMOUNT_KOPEKS": {
+      "default": 10000000,
+      "type": "int",
+      "secret": false
+    },
+    "AURAPAY_WEBHOOK_PATH": {
+      "default": "/aurapay-webhook",
+      "type": "str",
+      "secret": false
+    },
+    "AURAPAY_RETURN_URL": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "AURAPAY_PAYMENT_LIFETIME_MINUTES": {
+      "default": 60,
+      "type": "int",
+      "secret": false
+    },
+    "AURAPAY_SBP_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "AURAPAY_SBP_DISPLAY_NAME": {
+      "default": "СБП (AuraPay)",
+      "type": "str",
+      "secret": false
+    },
+    "AURAPAY_CARD_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "AURAPAY_CARD_DISPLAY_NAME": {
+      "default": "Карта (AuraPay)",
+      "type": "str",
+      "secret": false
+    },
+    "ANTILOPAY_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "ANTILOPAY_SECRET_ID": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "ANTILOPAY_PRIVATE_KEY": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "ANTILOPAY_PUBLIC_KEY": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "ANTILOPAY_PROJECT_ID": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "ANTILOPAY_DISPLAY_NAME": {
+      "default": "Antilopay",
+      "type": "str",
+      "secret": false
+    },
+    "ANTILOPAY_PRODUCT_NAME": {
+      "default": "VPN подписка",
+      "type": "str",
+      "secret": false
+    },
+    "ANTILOPAY_PRODUCT_TYPE": {
+      "default": "services",
+      "type": "str",
+      "secret": false
+    },
+    "ANTILOPAY_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "ANTILOPAY_MIN_AMOUNT_KOPEKS": {
+      "default": 10000,
+      "type": "int",
+      "secret": false
+    },
+    "ANTILOPAY_MAX_AMOUNT_KOPEKS": {
+      "default": 10000000,
+      "type": "int",
+      "secret": false
+    },
+    "ANTILOPAY_WEBHOOK_PATH": {
+      "default": "/antilopay-webhook",
+      "type": "str",
+      "secret": false
+    },
+    "ANTILOPAY_RETURN_URL": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "ANTILOPAY_PAYMENT_LIFETIME_MINUTES": {
+      "default": 60,
+      "type": "int",
+      "secret": false
+    },
+    "ANTILOPAY_SBP_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "ANTILOPAY_SBP_DISPLAY_NAME": {
+      "default": "СБП (Antilopay)",
+      "type": "str",
+      "secret": false
+    },
+    "ANTILOPAY_CARD_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "ANTILOPAY_CARD_DISPLAY_NAME": {
+      "default": "Карта (Antilopay)",
+      "type": "str",
+      "secret": false
+    },
+    "ANTILOPAY_APAY_VERIFICATION_TAG": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "ANTILOPAY_SBERPAY_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "ANTILOPAY_SBERPAY_DISPLAY_NAME": {
+      "default": "SberPay (Antilopay)",
+      "type": "str",
+      "secret": false
+    },
+    "JUPITER_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "JUPITER_TOKEN": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "JUPITER_SECRET": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "JUPITER_BASE_URL": {
+      "default": "https://app.juppiter.tech",
+      "type": "str",
+      "secret": false
+    },
+    "JUPITER_METHOD_ID": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "JUPITER_METHOD_DESCRIPTION": {
+      "default": "SBP",
+      "type": "str",
+      "secret": false
+    },
+    "JUPITER_DISPLAY_NAME": {
+      "default": "Jupiter",
+      "type": "str",
+      "secret": false
+    },
+    "JUPITER_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "JUPITER_MIN_AMOUNT_KOPEKS": {
+      "default": 10000,
+      "type": "int",
+      "secret": false
+    },
+    "JUPITER_MAX_AMOUNT_KOPEKS": {
+      "default": 10000000,
+      "type": "int",
+      "secret": false
+    },
+    "JUPITER_WEBHOOK_PATH": {
+      "default": "/jupiter-webhook",
+      "type": "str",
+      "secret": false
+    },
+    "JUPITER_RETURN_URL": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "JUPITER_PAYMENT_LIFETIME_MINUTES": {
+      "default": 60,
+      "type": "int",
+      "secret": false
+    },
+    "JUPITER_FALLBACK_EMAIL": {
+      "default": "user@vpn.bot",
+      "type": "str",
+      "secret": false
+    },
+    "JUPITER_FALLBACK_PHONE": {
+      "default": "0000000000",
+      "type": "str",
+      "secret": false
+    },
+    "JUPITER_FALLBACK_NAME": {
+      "default": "User",
+      "type": "str",
+      "secret": false
+    },
+    "JUPITER_SBP_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "JUPITER_SBP_DISPLAY_NAME": {
+      "default": "СБП (Jupiter)",
+      "type": "str",
+      "secret": false
+    },
+    "DONUT_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "DONUT_TOKEN": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "DONUT_SECRET": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "DONUT_BASE_URL": {
+      "default": "https://gw.donut.business",
+      "type": "str",
+      "secret": false
+    },
+    "DONUT_METHOD_ID": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "DONUT_DISPLAY_NAME": {
+      "default": "Donut",
+      "type": "str",
+      "secret": false
+    },
+    "DONUT_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "DONUT_MIN_AMOUNT_KOPEKS": {
+      "default": 10000,
+      "type": "int",
+      "secret": false
+    },
+    "DONUT_MAX_AMOUNT_KOPEKS": {
+      "default": 10000000,
+      "type": "int",
+      "secret": false
+    },
+    "DONUT_WEBHOOK_PATH": {
+      "default": "/donut-webhook",
+      "type": "str",
+      "secret": false
+    },
+    "DONUT_RETURN_URL": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "DONUT_PAYMENT_LIFETIME_MINUTES": {
+      "default": 60,
+      "type": "int",
+      "secret": false
+    },
+    "DONUT_CARD_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "DONUT_CARD_DISPLAY_NAME": {
+      "default": "Карта (Donut)",
+      "type": "str",
+      "secret": false
+    },
+    "DONUT_SBP_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "DONUT_SBP_DISPLAY_NAME": {
+      "default": "СБП (Donut)",
+      "type": "str",
+      "secret": false
+    },
+    "DONUT_SBP_QR_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "DONUT_SBP_QR_DISPLAY_NAME": {
+      "default": "СБП QR (Donut)",
+      "type": "str",
+      "secret": false
+    },
+    "CISPAY_RECURRENT_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "CISPAY_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "CISPAY_SHOP_ID": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "CISPAY_API_KEY": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "CISPAY_BASE_URL": {
+      "default": "https://api.cispay.app",
+      "type": "str",
+      "secret": false
+    },
+    "CISPAY_DISPLAY_NAME": {
+      "default": "CisPay",
+      "type": "str",
+      "secret": false
+    },
+    "CISPAY_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "CISPAY_MIN_AMOUNT_KOPEKS": {
+      "default": 10000,
+      "type": "int",
+      "secret": false
+    },
+    "CISPAY_MAX_AMOUNT_KOPEKS": {
+      "default": 10000000,
+      "type": "int",
+      "secret": false
+    },
+    "CISPAY_WEBHOOK_PATH": {
+      "default": "/cispay-webhook",
+      "type": "str",
+      "secret": false
+    },
+    "CISPAY_PAYMENT_LIFETIME_MINUTES": {
+      "default": 30,
+      "type": "int",
+      "secret": false
+    },
+    "CISPAY_CARD_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "CISPAY_CARD_DISPLAY_NAME": {
+      "default": "Карта (CisPay)",
+      "type": "str",
+      "secret": false
+    },
+    "CISPAY_SBP_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "CISPAY_SBP_DISPLAY_NAME": {
+      "default": "СБП (CisPay)",
+      "type": "str",
+      "secret": false
+    },
+    "CISPAY_CRYPTO_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "CISPAY_CRYPTO_DISPLAY_NAME": {
+      "default": "Криптовалюта (CisPay)",
+      "type": "str",
+      "secret": false
+    },
+    "CASHERA_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "CASHERA_API_KEY": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "CASHERA_API_SECRET": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "CASHERA_BASE_URL": {
+      "default": "https://api.cashera.cash/api/v1",
+      "type": "str",
+      "secret": false
+    },
+    "CASHERA_DISPLAY_NAME": {
+      "default": "Cashera",
+      "type": "str",
+      "secret": false
+    },
+    "CASHERA_ACTIVE_METHODS": {
+      "default": "sbp,card",
+      "type": "str",
+      "secret": false
+    },
+    "CASHERA_INLINE_METHODS": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "CASHERA_H2H_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "CASHERA_RECURRENT_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "CASHERA_MIN_AMOUNT_KOPEKS": {
+      "default": 10000,
+      "type": "int",
+      "secret": false
+    },
+    "CASHERA_MAX_AMOUNT_KOPEKS": {
+      "default": 10000000,
+      "type": "int",
+      "secret": false
+    },
+    "CASHERA_WEBHOOK_PATH": {
+      "default": "/cashera-webhook",
+      "type": "str",
+      "secret": false
+    },
+    "CASHERA_RETURN_URL": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "CASHERA_FAILED_URL": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "TABPAY_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "TABPAY_API_KEY": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "TABPAY_WEBHOOK_SECRET": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "TABPAY_BASE_URL": {
+      "default": "https://tabpay.org/api",
+      "type": "str",
+      "secret": false
+    },
+    "TABPAY_DISPLAY_NAME": {
+      "default": "TabPay",
+      "type": "str",
+      "secret": false
+    },
+    "TABPAY_MIN_AMOUNT_KOPEKS": {
+      "default": 10000,
+      "type": "int",
+      "secret": false
+    },
+    "TABPAY_MAX_AMOUNT_KOPEKS": {
+      "default": 10000000,
+      "type": "int",
+      "secret": false
+    },
+    "TABPAY_WEBHOOK_PATH": {
+      "default": "/tabpay-webhook",
+      "type": "str",
+      "secret": false
+    },
+    "TABPAY_WEBHOOK_MAX_AGE_SECONDS": {
+      "default": 300,
+      "type": "int",
+      "secret": false
+    },
+    "TABPAY_CARD_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "TABPAY_CARD_DISPLAY_NAME": {
+      "default": "Карта (TabPay)",
+      "type": "str",
+      "secret": false
+    },
+    "TABPAY_SBP_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "TABPAY_SBP_DISPLAY_NAME": {
+      "default": "СБП (TabPay)",
+      "type": "str",
+      "secret": false
+    },
+    "PARITYPAY_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "PARITYPAY_SHOP_ID": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "PARITYPAY_SECRET_KEY": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "PARITYPAY_CALLBACK_SECRET": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "PARITYPAY_BASE_URL": {
+      "default": "https://api.paritypay.net",
+      "type": "str",
+      "secret": false
+    },
+    "PARITYPAY_DISPLAY_NAME": {
+      "default": "ParityPay",
+      "type": "str",
+      "secret": false
+    },
+    "PARITYPAY_MIN_AMOUNT_KOPEKS": {
+      "default": 10000,
+      "type": "int",
+      "secret": false
+    },
+    "PARITYPAY_MAX_AMOUNT_KOPEKS": {
+      "default": 10000000,
+      "type": "int",
+      "secret": false
+    },
+    "PARITYPAY_WEBHOOK_PATH": {
+      "default": "/paritypay-webhook",
+      "type": "str",
+      "secret": false
+    },
+    "PARITYPAY_INVOICE_LIFETIME_MINUTES": {
+      "default": 60,
+      "type": "int",
+      "secret": false
+    },
+    "PARITYPAY_CARD_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "PARITYPAY_CARD_DISPLAY_NAME": {
+      "default": "Карта (ParityPay)",
+      "type": "str",
+      "secret": false
+    },
+    "PARITYPAY_SBP_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "PARITYPAY_SBP_DISPLAY_NAME": {
+      "default": "СБП (ParityPay)",
+      "type": "str",
+      "secret": false
+    },
+    "LAVA_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "LAVA_BASE_URL": {
+      "default": "https://api.lava.ru",
+      "type": "str",
+      "secret": false
+    },
+    "LAVA_SHOP_ID": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "LAVA_SECRET_KEY": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "LAVA_WEBHOOK_SECRET": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "LAVA_DISPLAY_NAME": {
+      "default": "Lava",
+      "type": "str",
+      "secret": false
+    },
+    "LAVA_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "LAVA_MIN_AMOUNT_KOPEKS": {
+      "default": 10000,
+      "type": "int",
+      "secret": false
+    },
+    "LAVA_MAX_AMOUNT_KOPEKS": {
+      "default": 10000000,
+      "type": "int",
+      "secret": false
+    },
+    "LAVA_WEBHOOK_PATH": {
+      "default": "/lava-webhook",
+      "type": "str",
+      "secret": false
+    },
+    "LAVA_RETURN_URL": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "LAVA_PAYMENT_LIFETIME_MINUTES": {
+      "default": 60,
+      "type": "int",
+      "secret": false
+    },
+    "LAVA_CARD_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "LAVA_CARD_DISPLAY_NAME": {
+      "default": "Карта (Lava)",
+      "type": "str",
+      "secret": false
+    },
+    "LAVA_SBP_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "LAVA_SBP_DISPLAY_NAME": {
+      "default": "СБП (Lava)",
+      "type": "str",
+      "secret": false
+    },
+    "LAVA_RECURRENT_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "ETOPLATEZHI_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "ETOPLATEZHI_PROJECT_ID": {
+      "default": null,
+      "type": "int",
+      "secret": false
+    },
+    "ETOPLATEZHI_SECRET_KEY": {
+      "default": null,
+      "type": "str",
+      "secret": true
+    },
+    "ETOPLATEZHI_DISPLAY_NAME": {
+      "default": "Etoplatezhi",
+      "type": "str",
+      "secret": false
+    },
+    "ETOPLATEZHI_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "ETOPLATEZHI_MIN_AMOUNT_KOPEKS": {
+      "default": 10000,
+      "type": "int",
+      "secret": false
+    },
+    "ETOPLATEZHI_MAX_AMOUNT_KOPEKS": {
+      "default": 10000000,
+      "type": "int",
+      "secret": false
+    },
+    "ETOPLATEZHI_WEBHOOK_PATH": {
+      "default": "/etoplatezhi-webhook",
+      "type": "str",
+      "secret": false
+    },
+    "ETOPLATEZHI_RETURN_URL": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "ETOPLATEZHI_PAYMENT_LIFETIME_MINUTES": {
+      "default": 60,
+      "type": "int",
+      "secret": false
+    },
+    "ETOPLATEZHI_SBP_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "ETOPLATEZHI_SBP_DISPLAY_NAME": {
+      "default": "СБП (Etoplatezhi)",
+      "type": "str",
+      "secret": false
+    },
+    "ETOPLATEZHI_CARD_ENABLED": {
+      "default": false,
+      "type": "bool",
+      "secret": false
+    },
+    "ETOPLATEZHI_CARD_DISPLAY_NAME": {
+      "default": "Карта (Etoplatezhi)",
+      "type": "str",
+      "secret": false
+    },
+    "ANORE_CHECKOUT_RATE": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "ANORE_CHECKOUT_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "ANTILOPAY_CHECKOUT_RATE": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "ANTILOPAY_CHECKOUT_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "AURAPAY_CHECKOUT_RATE": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "AURAPAY_CHECKOUT_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "CASHERA_CHECKOUT_RATE": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "CASHERA_CHECKOUT_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "CISPAY_CHECKOUT_RATE": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "CISPAY_CHECKOUT_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "CLOUDPAYMENTS_CHECKOUT_RATE": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "CLOUDPAYMENTS_CHECKOUT_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "DONUT_CHECKOUT_RATE": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "DONUT_CHECKOUT_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "FREEKASSA_CHECKOUT_RATE": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "FREEKASSA_CHECKOUT_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "JUPITER_CHECKOUT_RATE": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "JUPITER_CHECKOUT_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "KASSA_AI_CHECKOUT_RATE": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "KASSA_AI_CHECKOUT_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "LAVA_CHECKOUT_RATE": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "LAVA_CHECKOUT_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "MULENPAY_CHECKOUT_RATE": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "MULENPAY_CHECKOUT_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "OVERPAY_CHECKOUT_RATE": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "OVERPAY_CHECKOUT_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "PAL24_CHECKOUT_RATE": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "PAL24_CHECKOUT_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "PARITYPAY_CHECKOUT_RATE": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "PARITYPAY_CHECKOUT_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "PLATEGA_CHECKOUT_RATE": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "PLATEGA_CHECKOUT_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "RIOPAY_CHECKOUT_RATE": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "RIOPAY_CHECKOUT_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "ROLLYPAY_CHECKOUT_RATE": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "ROLLYPAY_CHECKOUT_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "SEVERPAY_CHECKOUT_RATE": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "SEVERPAY_CHECKOUT_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "TABPAY_CHECKOUT_RATE": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "TABPAY_CHECKOUT_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "WATA_CHECKOUT_RATE": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "WATA_CHECKOUT_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "YOOKASSA_CHECKOUT_RATE": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "YOOKASSA_CHECKOUT_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "CRYPTOBOT_CHECKOUT_RATE": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "CRYPTOBOT_CHECKOUT_CURRENCY": {
+      "default": "USDT",
+      "type": "str",
+      "secret": false
+    },
+    "HELEKET_CHECKOUT_RATE": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "HELEKET_CHECKOUT_CURRENCY": {
+      "default": "USD",
+      "type": "str",
+      "secret": false
+    },
+    "ETOPLATEZHI_CHECKOUT_RATE": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    },
+    "ETOPLATEZHI_CHECKOUT_CURRENCY": {
+      "default": "RUB",
+      "type": "str",
+      "secret": false
+    },
+    "ETOPLATEZHI_CALLBACK_URL": {
+      "default": null,
+      "type": "str",
+      "secret": false
+    }
+  }
+}

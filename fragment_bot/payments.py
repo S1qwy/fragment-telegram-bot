@@ -11,6 +11,7 @@ from aiogram.utils.token import TokenValidationError
 
 from .catalog import Product, username
 from .config import Config, ShopError
+from .provider_config import ProviderConfig
 from .store import Order, Store
 from .transport import ProxySession
 from .views import (
@@ -59,6 +60,11 @@ class Checkout:
         return resolve_icon_mode(self.store.settings()["premium_icons"], self.inherited_icons)
 
     def create(self, buyer: int, product: Product, recipient: str, terms: str) -> Order:
+        if (
+            self.gateway.name == "telegram_stars"
+            and not ProviderConfig(self.store).values()["TELEGRAM_STARS_ENABLED"]
+        ):
+            raise ShopError("Оплата Telegram Stars отключена.")
         return self.store.create_order(
             buyer,
             product,
@@ -66,9 +72,17 @@ class Checkout:
             terms,
             provider=self.gateway.name,
             currency=self.gateway.currency,
+            payment_amount=self.gateway.amount(product.price)
+            if hasattr(self.gateway, "amount")
+            else None,
         )
 
     def authorize(self, order_id: str, buyer: int, amount: int, currency: str, query: str) -> bool:
+        if (
+            self.gateway.name == "telegram_stars"
+            and not ProviderConfig(self.store).values()["TELEGRAM_STARS_ENABLED"]
+        ):
+            return False
         return currency == self.gateway.currency and self.store.reserve_checkout(
             order_id,
             buyer,

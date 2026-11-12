@@ -118,15 +118,21 @@ class Order:
     transaction_id: str | None
     note: str | None
     created_at: str
+    quoted_price: int | None = None
 
     @property
     def product(self) -> Product:
-        return Product(self.kind, self.quantity, self.price)
+        return Product(self.kind, self.quantity, self.quoted_price or self.price)
 
     def summary(self, *, admin: bool = False) -> str:
+        amount = (
+            str(self.price)
+            if self.currency == "XTR"
+            else f"{self.price // 100}.{self.price % 100:02d}"
+        )
         text = (
             f"#{self.id}\n{self.product.label} → @{self.recipient}\n"
-            f"{self.price} {self.currency} · {STATUS[self.state]}"
+            f"{amount} {self.currency} · {STATUS[self.state]}"
         )
         if admin:
             text += f"\nПокупатель: {self.buyer}"
@@ -149,6 +155,8 @@ class Store:
             db.execute("PRAGMA journal_mode=WAL")
             db.executescript(SCHEMA)
             db.execute("BEGIN IMMEDIATE")
+            if "quoted_price" not in {row[1] for row in db.execute("PRAGMA table_info(orders)")}:
+                db.execute("ALTER TABLE orders ADD COLUMN quoted_price INTEGER")
             row = db.execute("SELECT value FROM metadata WHERE key='mode'").fetchone()
             if row and row["value"] != mode:
                 raise ShopError("Для другого SHOP_MODE укажите отдельный DATA_DIR.")
@@ -273,7 +281,12 @@ class Store:
         *,
         provider: str,
         currency: str,
+        payment_amount: int | None = None,
     ) -> Order:
+        if payment_amount is not None and (
+            type(payment_amount) is not int or not 1 <= payment_amount <= 10**12
+        ):
+            raise ShopError("Недопустимая сумма платежа.")
         order_id = uuid4().hex[:16]
         with self.connection() as db:
             db.execute("BEGIN IMMEDIATE")
@@ -285,18 +298,19 @@ class Store:
             if current != product or terms != settings["terms"]:
                 raise ShopError("Каталог или условия изменились. Откройте товар заново.")
             row = db.execute(
-                "INSERT INTO orders (id,buyer,kind,quantity,price,recipient,terms,provider,currency) "
-                "VALUES (?,?,?,?,?,?,?,?,?) RETURNING *",
+                "INSERT INTO orders (id,buyer,kind,quantity,price,recipient,terms,provider,currency,quoted_price) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?) RETURNING *",
                 (
                     order_id,
                     buyer,
                     product.kind,
                     product.quantity,
-                    product.price,
+                    product.price if payment_amount is None else payment_amount,
                     recipient,
                     terms,
                     provider,
                     currency,
+                    product.price,
                 ),
             ).fetchone()
             return Order(**row)

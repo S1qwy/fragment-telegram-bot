@@ -1,0 +1,118 @@
+{
+  "repository": "https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot",
+  "commit": "0fb7453a1f606c51e4ad92fa155436eb06e04081",
+  "files": {
+    "anore": {
+      "source": "app/services/anore_service.py",
+      "sha256": "f68cb79cb7c474e544d3e60e65ac27abcea63616151c3b59d0c5a8b0ccc784c7"
+    },
+    "antilopay": {
+      "source": "app/services/antilopay_service.py",
+      "sha256": "20ecbd77c3cb852ef70b1fdd5a657c4d305727ae3504878a0db46b8267b489b5"
+    },
+    "aurapay": {
+      "source": "app/services/aurapay_service.py",
+      "sha256": "798c6801bdd2ff472a2138c3f62c124cfe72a97e4c01b6e1046f85c11a1ba065"
+    },
+    "cashera": {
+      "source": "app/services/cashera_service.py",
+      "sha256": "733180f5c1d8ce5906da2c4a3cbad5be928d1787983430f78057093619968d62"
+    },
+    "cispay": {
+      "source": "app/services/cispay_service.py",
+      "sha256": "9644e52d3567385a658006399373cf8665150e87a61b7eb614ed6e6d2a5da8e0"
+    },
+    "cloudpayments": {
+      "source": "app/services/cloudpayments_service.py",
+      "sha256": "d7284cae3307361573a4086c90ce303e475b9e0cd41c2384e529bfcd868ae63a"
+    },
+    "donut": {
+      "source": "app/services/donut_service.py",
+      "sha256": "8f3980c3195d3d709cd0a3543b304e7fb04eed631d3aa2fefeddf9050610fbf5"
+    },
+    "etoplatezhi": {
+      "source": "app/services/etoplatezhi_service.py",
+      "sha256": "761d3cf10053a613e522082ee38fe5e5f714f49612647a685d7401e011addf31"
+    },
+    "freekassa": {
+      "source": "app/services/freekassa_service.py",
+      "sha256": "b8338b49914dafbe219014a25492bddb32cca1619fbe46e35b878633e1b34e73"
+    },
+    "jupiter": {
+      "source": "app/services/jupiter_service.py",
+      "sha256": "006ebcd1087f7672bb30a26e361b6aa71b4194f2cb9a6f74ab0f267b740a3771"
+    },
+    "kassa_ai": {
+      "source": "app/services/kassa_ai_service.py",
+      "sha256": "7c128de96ff009ef9417418896aab90a6a8302ec502e3fce4d77f874adb24c06"
+    },
+    "lava": {
+      "source": "app/services/lava_service.py",
+      "sha256": "6e84dbc1edd6961f625f5c286930ea689c691d7b4620c7e0b403edc71bca1143"
+    },
+    "mulenpay": {
+      "source": "app/services/mulenpay_service.py",
+      "sha256": "9a9b0c8eed9e172b3137c452cca1fab4555f41747f7ef5a1a72ba80d1c1020d6"
+    },
+    "overpay": {
+      "source": "app/services/overpay_service.py",
+      "sha256": "2f37d00747a7a388e2ab5816e97828fa61203131ff3d4b039146eda6090bb02a"
+    },
+    "pal24": {
+      "source": "app/services/pal24_service.py",
+      "sha256": "c203e8a5a91083ff77928bc4596a97b7be98250c385af02052606f9def4f56e9"
+    },
+    "paritypay": {
+      "source": "app/services/paritypay_service.py",
+      "sha256": "70d6dc71f1d4a35a2a960c016341fbde8edcc8a283c646f8cd7e88f81f881070"
+    },
+    "platega": {
+      "source": "app/services/platega_service.py",
+      "sha256": "4adb564558a32c6026bcfc0f44560a6f2acf819963f6949412f166b337a047b8"
+    },
+    "riopay": {
+      "source": "app/services/riopay_service.py",
+      "sha256": "6438d6869c9ad87658e12f60a78154a476ca78e83575119b55c75f09faf762bd"
+    },
+    "rollypay": {
+      "source": "app/services/rollypay_service.py",
+      "sha256": "3e51ea49dace66c36a474bffd4b036b66666492c99af9a69a582e67c208f238d"
+    },
+    "severpay": {
+      "source": "app/services/severpay_service.py",
+      "sha256": "e2e5c84394144fc7b462a1191adfc26a579ccf63048010d01288d4970ec59869"
+    },
+    "tabpay": {
+      "source": "app/services/tabpay_service.py",
+      "sha256": "d331d3a03112e1662e7f6f6bdad4e46bcbe4515a6cdbc2265f6dcc94e0ae5fcb"
+    },
+    "wata": {
+      "source": "app/services/wata_service.py",
+      "sha256": "9dcbe90ba5e638bbb9f30deb76628c68271d21d321b8c802a6d1b87b339ae500"
+    },
+    "yookassa": {
+      "source": "app/services/yookassa_service.py",
+      "sha256": "1998cfd09aa4ea96a7a4993edf3b0100e0c778c0a3e4aa7ad62b14d63e33942d"
+    },
+    "cryptobot": {
+      "source": "app/external/cryptobot.py",
+      "sha256": "cc5f343088866dda60c7d1596a6f33ad0e3d44c86ac3038afd88913bab27b517"
+    },
+    "heleket": {
+      "source": "app/external/heleket.py",
+      "sha256": "f7810051019ae5722de43dc3fd7cd2bed2d2f1bc3af0e005bf3093e955cadfe6"
+    },
+    "tribute": {
+      "source": "app/external/tribute.py",
+      "sha256": "8120f22a52ccbec086242b2cf1a058995e5f84aadebc3e311aa41983c4b9189d"
+    },
+    "apple_iap": {
+      "source": "app/external/apple_iap.py",
+      "sha256": "05960514569935cfd41ce721afd69436ade6ba1b64733a6d1ddf11f5b6ccc447"
+    },
+    "pal24_client": {
+      "source": "app/external/pal24_client.py",
+      "sha256": "c0f22049e33a56f31c140a3824d7e029fd0006c586427585367f21b29e545ab8"
+    }
+  }
+}

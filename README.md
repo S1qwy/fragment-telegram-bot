@@ -16,7 +16,7 @@ Requires Python 3.11+, Git and [uv](https://docs.astral.sh/uv/).
 git clone --branch dev https://github.com/S1qwy/fragment-telegram-bot.git
 cd fragment-telegram-bot
 cp .env.example .env
-uv sync --locked
+uv sync --locked --extra providers
 uv run fragment-bot run
 ```
 
@@ -80,7 +80,7 @@ Customer commands: `/start`, `/catalog`, `/orders`, `/order ID`, `/support`, `/p
 
 ## Payments: implemented providers
 
-The implemented adapters are **Telegram Stars (XTR)** and **DemoGateway**. YooKassa, CryptoBot and other Bedolaga providers are not bundled or configured. Automated tests exercise invoices, pre-checkout, receipt verification, duplicate handling and refunds; they do not prove that a particular deployment has completed a real payment.
+The customer order checkout adapters are **Telegram Stars (XTR)** and **DemoGateway**. API clients for all **28 Bedolaga gateway identifiers** are now bundled, with **420 upstream configuration fields** and a paginated admin editor. External sales channels can create and reconcile orders through the CLI or Python API. The Telegram storefront uses XTR. Apple IAP and Tribute have separate integration flows. See the [complete provider inventory, setup and API reference](docs/providers.md). Automated tests exercise invoices, pre-checkout, receipt verification, duplicate handling and refunds; they do not prove that a particular deployment has completed a real payment.
 
 Digital goods sold inside Telegram must use XTR under [Telegram's digital goods payment rules](https://core.telegram.org/bots/payments-stars). `provider_token` is empty for XTR. The bot waits for `successful_payment`, stores the original charge ID and verifies the payer, provider, currency, amount and order. Repeated receipts do not duplicate fulfillment. Unmatched payments are kept for manual reconciliation. TON wallet funding for Fragment fulfillment is separate from the customer's XTR payment.
 
@@ -125,14 +125,14 @@ For offline demo testing, use `demo-settings` and `demo-buy stars 50 @example`. 
 
 ## Attribution
 
-Architecture and interaction patterns are adapted from [Remnawave Bedolaga Telegram Bot](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot), including its [payment modules](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/tree/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/services/payment), [Stars payment handler](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/blob/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/handlers/stars_payments.py), [webhook routing](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/blob/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/webserver/payments.py), [menu](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/blob/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/handlers/menu.py), [rich menu utilities](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/blob/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/utils/rich_menu.py) and [menu layout settings](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/blob/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/services/menu_layout/constants.py). This repository implements the storefront specifically for [fragment-api-py](https://github.com/S1qwy/fragment-api-py); it does not claim to include every upstream payment provider.
+Architecture and interaction patterns are adapted from [Remnawave Bedolaga Telegram Bot](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot), including its [payment modules](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/tree/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/services/payment), [Stars payment handler](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/blob/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/handlers/stars_payments.py), [webhook routing](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/blob/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/webserver/payments.py), [menu](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/blob/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/handlers/menu.py), [rich menu utilities](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/blob/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/utils/rich_menu.py) and [menu layout settings](https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/blob/0fb7453a1f606c51e4ad92fa155436eb06e04081/app/services/menu_layout/constants.py). This repository implements the storefront specifically for [fragment-api-py](https://github.com/S1qwy/fragment-api-py). Ported provider modules retain the upstream **MIT + Commons Clause** license; see [third-party notices](THIRD_PARTY_NOTICES.md).
 
 ## Development
 
 Work is currently on `dev`.
 
 ```sh
-uv sync --locked --extra dev
+uv sync --locked --extra dev --extra providers
 uv run ruff check .
 uv run ruff format --check .
 uv run pytest

@@ -95,6 +95,7 @@ def build_settings_router(config: Config, store: Store) -> Router:
             [button(title, f"settings:group:{group}")]
             for group, (title, _) in SETTING_GROUPS.items()
         ]
+        rows.append([button("💳 Все платёжные провайдеры", "gateways:0")])
         if config.mode in {"demo", "test"}:
             rows.append([button("🧪 Демо-профиль", "settings:demo", style="primary")])
         shop_status = display_value("open", settings["open"])

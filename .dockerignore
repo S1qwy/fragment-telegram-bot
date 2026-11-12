@@ -5,6 +5,7 @@
 data
 data-*
 *.sqlite3*
+**/provider-settings.key
 __pycache__
 .pytest_cache
 .ruff_cache
